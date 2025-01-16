@@ -1,7 +1,6 @@
-import json
-import glob
-import os
 import streamlit as st
+import json
+import os
 
 ###############################################################################
 # ユニークキー付きウィジェット（DuplicateWidgetID対策）
@@ -111,43 +110,41 @@ def annotate_q_and_a(file_idx: int, proj_idx: int, q_and_a: dict):
 # メイン処理
 ###############################################################################
 
-st.title("フォルダ内のDX Projects 一括アノテーションツール")
-
-# 1) フォルダパスをテキスト入力で取得
-folder_path = st.text_input("JSONファイルが格納されているフォルダパスを入力してください", value="json_data")
-
-# フォルダが存在するかチェック
-if not os.path.isdir(folder_path):
-    st.warning("有効なフォルダパスを入力してください。")
-    st.stop()
-
-# 2) フォルダ内の .json ファイルをすべて取得
-json_paths = glob.glob(os.path.join(folder_path, "*.json"))
-if not json_paths:
-    st.warning(f"指定フォルダ({folder_path})に json ファイルがありません。")
-    st.stop()
-
-st.write(f"以下のフォルダから {len(json_paths)} 件のJSONファイルを読み込みます:")
-for path in json_paths:
-    st.write(f"- {path}")
+st.title("複数JSONファイルのDX Projects アノテーションツール")
 
 # セッションステート初期化
 if "annotations" not in st.session_state:
     st.session_state["annotations"] = {}
 
-# 3) 全ファイルを読み込んでUI生成
-for file_idx, json_file_path in enumerate(json_paths):
-    # ファイル読み込み
-    with open(json_file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+# 1) 複数JSONファイルをアップロード
+uploaded_files = st.file_uploader(
+    "アノテーション対象の JSON ファイルをアップロードしてください",
+    type="json",
+    accept_multiple_files=True
+)
+
+if not uploaded_files:
+    st.info("JSONファイルをアップロードしてください。")
+    st.stop()
+
+# 2) アップロードされたファイルを順に処理
+for file_idx, uploaded_file in enumerate(uploaded_files):
+    # ファイル名の取得
+    file_name = uploaded_file.name
+    st.markdown("---")
+    st.markdown(f"## ファイル: `{file_name}`")
+
+    # JSONの読み込み
+    try:
+        data = json.loads(uploaded_file.read().decode("utf-8"))
+    except Exception as e:
+        st.error(f"JSONの読み込み中にエラーが発生しました: {e}")
+        continue
 
     # DXProjects が無ければスキップ
     if "DXProjects" not in data:
-        st.error(f"ファイル {json_file_path} に 'DXProjects' キーが見つかりません。スキップします。")
+        st.error(f"ファイル {file_name} に 'DXProjects' キーが見つかりません。スキップします。")
         continue
-
-    st.markdown("---")
-    st.markdown(f"## ファイル: `{json_file_path}`")
 
     # ファイルに含まれるプロジェクト(企業)を順に表示
     for proj_idx, project in enumerate(data["DXProjects"]):
@@ -157,16 +154,23 @@ for file_idx, json_file_path in enumerate(json_paths):
         with st.expander(f"[{company_name}] / 課題: {purpose}", expanded=False):
             # 企業ごとのアノテーションUI
             annotate_roi(file_idx, proj_idx, project)
-            annotate_roi_trees(file_idx, proj_idx, project["roiTrees"])
-            annotate_q_and_a(file_idx, proj_idx, project["QAndA"])
+
+            # roiTrees を持っていない場合もあるかもしれないのでチェック
+            if "roiTrees" in project:
+                annotate_roi_trees(file_idx, proj_idx, project["roiTrees"])
+            else:
+                st.warning("この企業のデータに 'roiTrees' がありません。")
+
+            # QAndA も同様にチェック
+            if "QAndA" in project:
+                annotate_q_and_a(file_idx, proj_idx, project["QAndA"])
+            else:
+                st.warning("この企業のデータに 'QAndA' がありません。")
 
             # 「この会社(プロジェクト)の評価を保存」ボタン
             save_button_key = f"save_btn_file{file_idx}_proj{proj_idx}"
             if st.button(f"『{company_name}』の評価を保存", key=save_button_key):
                 # アノテーション結果を反映した1社分の JSON を書き出す
-                # (元データを読み直し → 該当プロジェクトだけに annotation を付与 → 別ファイルに出力)
-
-                # まず、プロジェクトに annotation を付ける
                 project.setdefault("annotation", {})
 
                 # ROI
@@ -179,32 +183,34 @@ for file_idx, json_file_path in enumerate(json_paths):
 
                 # ROIツリー
                 roi_trees_annotation = {}
-                for depth_key in project["roiTrees"].keys():
-                    base_key = f"file{file_idx}_proj{proj_idx}_roiTrees_{depth_key}"
-                    good_or_bad_key = base_key + "_good_or_bad"
-                    comment_key = base_key + "_comment"
-                    roi_trees_annotation[depth_key] = {
-                        "良いor悪い": st.session_state["annotations"].get(good_or_bad_key, "未評価"),
-                        "コメント": st.session_state["annotations"].get(comment_key, "")
-                    }
+                if "roiTrees" in project:
+                    for depth_key in project["roiTrees"].keys():
+                        base_key = f"file{file_idx}_proj{proj_idx}_roiTrees_{depth_key}"
+                        good_or_bad_key = base_key + "_good_or_bad"
+                        comment_key = base_key + "_comment"
+                        roi_trees_annotation[depth_key] = {
+                            "良いor悪い": st.session_state["annotations"].get(good_or_bad_key, "未評価"),
+                            "コメント": st.session_state["annotations"].get(comment_key, "")
+                        }
                 project["annotation"]["roiTrees評価"] = roi_trees_annotation
 
                 # Q&A
                 q_and_a_annotation = {}
-                for depth_key, qa_list in project["QAndA"].items():
-                    depth_evals = []
-                    for qa_item_idx, qa_item in enumerate(qa_list):
-                        question_evals = []
-                        for q_idx in range(len(qa_item["questions"])):
-                            base_key = f"file{file_idx}_proj{proj_idx}_QAndA_{depth_key}_{qa_item_idx}_{q_idx}"
-                            qa_good_or_bad_key = base_key + "_good_or_bad"
-                            qa_comment_key = base_key + "_comment"
-                            question_evals.append({
-                                "良いor悪い": st.session_state["annotations"].get(qa_good_or_bad_key, "未評価"),
-                                "コメント": st.session_state["annotations"].get(qa_comment_key, "")
-                            })
-                        depth_evals.append(question_evals)
-                    q_and_a_annotation[depth_key] = depth_evals
+                if "QAndA" in project:
+                    for depth_key, qa_list in project["QAndA"].items():
+                        depth_evals = []
+                        for qa_item_idx, qa_item in enumerate(qa_list):
+                            question_evals = []
+                            for q_idx in range(len(qa_item["questions"])):
+                                base_key = f"file{file_idx}_proj{proj_idx}_QAndA_{depth_key}_{qa_item_idx}_{q_idx}"
+                                qa_good_or_bad_key = base_key + "_good_or_bad"
+                                qa_comment_key = base_key + "_comment"
+                                question_evals.append({
+                                    "良いor悪い": st.session_state["annotations"].get(qa_good_or_bad_key, "未評価"),
+                                    "コメント": st.session_state["annotations"].get(qa_comment_key, "")
+                                })
+                            depth_evals.append(question_evals)
+                        q_and_a_annotation[depth_key] = depth_evals
                 project["annotation"]["QAndA評価"] = q_and_a_annotation
 
                 # 出力用に「この1社だけ」の構造を作る
@@ -212,21 +218,19 @@ for file_idx, json_file_path in enumerate(json_paths):
                     "DXProjects": [project]
                 }
 
-                # ファイル名を決める (例: data.json -> data_A社_annotated.json)
-                base_name = os.path.basename(json_file_path)  # 例: data.json
-                base_root, base_ext = os.path.splitext(base_name)
+                # 元ファイル名から拡張子除去
+                base_root, base_ext = os.path.splitext(file_name)
                 # 企業名に使えない文字があれば置換する
                 safe_company_name = company_name.replace("/", "_").replace("\\", "_").replace(" ", "_")
                 out_filename = f"{base_root}_{safe_company_name}_annotated.json"
 
-                # 同じフォルダ内に保存する例
-                out_path = os.path.join(folder_path, out_filename)
-
-                # 書き出し
-                with open(out_path, "w", encoding="utf-8") as out_f:
-                    json.dump(single_project_data, out_f, ensure_ascii=False, indent=2)
-
-                st.success(f"『{company_name}』の評価結果を保存しました: {out_path}")
+                # ローカルに保存 (ローカル実行時のみ有効)
+                try:
+                    with open(out_filename, "w", encoding="utf-8") as out_f:
+                        json.dump(single_project_data, out_f, ensure_ascii=False, indent=2)
+                    st.success(f"『{company_name}』の評価結果をローカルファイル '{out_filename}' に保存しました。")
+                except Exception as e:
+                    st.warning(f"ローカルへの保存でエラーが発生しました: {e}")
 
                 # ダウンロードボタン（ブラウザからもDLできるようにする）
                 download_data = json.dumps(single_project_data, ensure_ascii=False, indent=2)
