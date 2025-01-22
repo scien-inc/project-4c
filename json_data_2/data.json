@@ -1,0 +1,413 @@
+{
+    "DXProjects": [
+      {
+        "table": {
+          "企業名": "A社",
+          "課題・目的": "倉庫内の在庫管理と出荷作業に時間と人的コストがかかりすぎていた",
+          "提案": "自動倉庫システム＋在庫管理ソフトの導入により、作業の効率化と在庫精度の向上を図る",
+          "目的を達成するための定量要素（目的の分解）": [
+            "在庫カウント工数（現状1日あたり5時間×10名→導入後2時間×5名）",
+            "ピッキングミス削減（現状月平均50件→導入後20件）",
+            "平均出荷リードタイム短縮（現状2.5日→導入後1.5日）"
+          ],
+          "ROI算定": [
+            "コスト削減効果：月間作業時間 300時間 → 150時間に削減（時給3,000円換算で月45万円削減）",
+            "売上増加効果：誤出荷減少により返品対応コスト低減＋信頼度向上で追加受注見込み約500万円/年"
+          ]
+        },
+        "roiTrees_assignment": {
+          "depth3": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]",
+          "depth4": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n            CR_A1 --> CR_A2[人件費削減(約45万円/月)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]\n            RI_A1 --> RI_A2[新規取引先増(年+10社)]",
+          "depth5": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n            CR_A1 --> CR_A2[人件費削減(約45万円/月)]\n                CR_A2 --> CR_A3[在庫ロス防止(年120万円相当)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]\n            RI_A1 --> RI_A2[新規取引先増(年+10社)]\n                RI_A2 --> RI_A3[長期契約化によるLTV向上(1社あたり年+50万円)]"
+        },
+        "QAndA_assignment": {
+          "Depth3": [
+            {
+              "parentNode": "CostReduction",
+              "childNode": "CR_A1 (作業時間短縮)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのようにコストを下げようと考えていますか？",
+                  "answer": "無駄な作業時間を見直して削減することで、コストを下げられると考えています。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "どのコストが最も大きな負担になっているのでしょうか？",
+                  "answer": "人件費が一番大きな負担となっております。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの工程の作業時間を優先的に短縮するべきだと思いますか？",
+                  "answer": "在庫カウントやピッキング作業など、人手に依存する部分を優先すべきと考えます。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が作業時間短縮のプランを立案・実行しますか？",
+                  "answer": "現場管理者と業務改善チームが中心となって対応します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どこで一番効果的に作業時間を短縮できると考えていますか？",
+                  "answer": "手作業比率の高い倉庫内作業エリアが最も有効と考えています。"
+                }
+              ]
+            },
+            {
+              "parentNode": "RevenueIncrease",
+              "childNode": "RI_A1 (追加受注獲得)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どうやって売上を伸ばすお考えですか？",
+                  "answer": "在庫精度の向上や迅速な出荷対応で、顧客満足度を高めることで売上拡大を狙っています。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "何が現状の受注拡大を阻害している要因でしょうか？",
+                  "answer": "誤出荷や出荷遅延などが顧客満足度を下げ、リピート受注を妨げています。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの顧客層へのアプローチが最も売上増につながると考えていますか？",
+                  "answer": "既存顧客のリピート率を高める施策と、新規大口顧客への訴求が重要と考えます。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰を中心に売上増加施策を展開しますか？",
+                  "answer": "営業チームとマーケティングチームが連携しながら対応します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どのチャネルや市場で追加受注を狙いますか？",
+                  "answer": "オンライン通販と法人向け直販の両方を強化し、追加受注を狙います。"
+                }
+              ]
+            }
+          ],
+          "Depth4": [
+            {
+              "parentNode": "CR_A1 (作業時間短縮)",
+              "childNode": "CR_A2 (人件費削減)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように人件費を削減しようとお考えですか？",
+                  "answer": "作業時間短縮により、残業や追加人員を削減できると考えています。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "人件費が高騰する要因は何でしょうか？",
+                  "answer": "長時間労働や必要以上の人員配置が要因になっています。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの部署の人件費削減が最も効果的ですか？",
+                  "answer": "倉庫オペレーション部門が最も工数が大きいため効果的です。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が削減プランの実務を担う予定でしょうか？",
+                  "answer": "現場管理者が労務管理を見直し、改善施策を実施します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どこで具体的な削減施策を実行しますか？",
+                  "answer": "在庫管理やピッキング作業を行う現場で行う予定です。"
+                }
+              ]
+            },
+            {
+              "parentNode": "RI_A1 (追加受注獲得)",
+              "childNode": "RI_A2 (新規取引先増)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "新規取引先を増やすにはどのような方法がありますか？",
+                  "answer": "展示会への積極的な出展やオンライン営業活動を強化します。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "新規取引先獲得のために必要なリソースは何でしょうか？",
+                  "answer": "営業マンの育成や広告宣伝費などが必要になります。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの市場をターゲットに新規取引先を開拓しますか？",
+                  "answer": "現状は国内BtoB市場を重点ターゲットに考えています。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が新規開拓の中心になりますか？",
+                  "answer": "既存の営業チームに専門の新規開拓担当を置く予定です。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どこで新規取引先との接点を作るのが効果的ですか？",
+                  "answer": "業界専門の展示会やオンラインでのウェビナーが効果的と考えています。"
+                }
+              ]
+            }
+          ],
+          "Depth5": [
+            {
+              "parentNode": "CR_A2 (人件費削減)",
+              "childNode": "CR_A3 (在庫ロス防止)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように在庫ロスを防止するつもりですか？",
+                  "answer": "在庫管理の精度を高め、適正在庫を維持することでロスを防ぎたいです。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "在庫ロスによって発生する具体的なコストは何でしょうか？",
+                  "answer": "廃棄品の処分費用や機会損失などが発生します。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの商品カテゴリの在庫ロスが最も大きいと考えていますか？",
+                  "answer": "賞味期限や使用期限のある製品が最もロスが大きいです。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が在庫ロス防止策をモニタリングしますか？",
+                  "answer": "倉庫管理チームと在庫管理システムの担当者が定期的に確認します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの拠点で在庫ロスが最も起きやすいと見ていますか？",
+                  "answer": "大型拠点で回転率が低い商品の在庫を多く抱える場所が要注意です。"
+                }
+              ]
+            },
+            {
+              "parentNode": "RI_A2 (新規取引先増)",
+              "childNode": "RI_A3 (長期契約化によるLTV向上)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように長期契約を促進してLTVを向上させますか？",
+                  "answer": "契約条件の見直しやアフターサポート強化で継続率を高めます。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "長期契約がもたらす具体的なメリットは何でしょうか？",
+                  "answer": "安定収益の確保や顧客満足度の向上につながります。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの顧客セグメントから長期契約化を進めるのが効率的でしょうか？",
+                  "answer": "リピート率の高い法人顧客から進めるのが効果的です。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰がLTV向上施策を具体化していきますか？",
+                  "answer": "顧客成功（CS）チームやカスタマーサポート担当が中心となります。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どのタイミングまたは場所で長期契約の提案を行うと効果的ですか？",
+                  "answer": "初回契約更新時や追加発注のタイミングで提案すると効果的です。"
+                }
+              ]
+            }
+          ]
+        },
+        "roiTrees_suggest": {
+          "depth3": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]",
+          "depth4": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n            CR_A1 --> CR_A2[人件費削減(約45万円/月)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]\n            RI_A1 --> RI_A2[新規取引先増(年+10社)]",
+          "depth5": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[作業時間短縮(約150時間/月)]\n            CR_A1 --> CR_A2[人件費削減(約45万円/月)]\n                CR_A2 --> CR_A3[在庫ロス防止(年120万円相当)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_A1[追加受注獲得(約500万円/年)]\n            RI_A1 --> RI_A2[新規取引先増(年+10社)]\n                RI_A2 --> RI_A3[長期契約化によるLTV向上(1社あたり年+50万円)]"
+        },
+        "QAndA_suggest": {
+          "Depth3": [
+            {
+              "childNode": "CR_A1 (作業時間短縮)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように作業時間を短縮していく提案をお考えですか？",
+                  "answer": "自動倉庫システムや在庫データのリアルタイム更新で手動作業を減らす提案を想定しています。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "具体的に何を導入して作業時間を短縮するのですか？",
+                  "answer": "自動搬送ロボットやバーコード管理システムを導入して短縮を図ります。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どれが一番早く効果を発揮できる提案でしょうか？",
+                  "answer": "まずはバーコード管理を徹底するだけでも大幅にミスと時間を減らせます。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が作業時間短縮のための新システムを運用しますか？",
+                  "answer": "現場のリーダーとIT担当が連携して運用します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの現場に導入するのが最も効果的でしょうか？",
+                  "answer": "作業が集中するメイン倉庫にまず導入するのが効果的です。"
+                }
+              ]
+            },
+            {
+              "childNode": "RI_A1 (追加受注獲得)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように追加受注を増やす提案をお考えですか？",
+                  "answer": "出荷リードタイムの短縮と誤出荷の削減で顧客満足度を上げ、リピートや紹介を増やす方針です。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "具体的にどのような施策を用意して売上増を狙いますか？",
+                  "answer": "スピード出荷をアピールする広告施策や、返品率削減を売りにした営業トークなどを用意します。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どのターゲット顧客にアプローチする提案になりますか？",
+                  "answer": "EC市場の法人顧客や、定期的に大量発注を行うリピーターが中心です。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "追加受注の獲得を一番牽引するのは誰でしょうか？",
+                  "answer": "営業とカスタマーサポートが連携し、既存顧客の満足度向上と新規顧客開拓を同時に進めます。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの販路や場所で追加の受注を獲得する見込みですか？",
+                  "answer": "オンラインBtoBプラットフォームや、展示会など対面での商談機会を重視しています。"
+                }
+              ]
+            }
+          ],
+          "Depth4": [
+            {
+              "childNode": "CR_A2 (人件費削減)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どうやって人件費を削減する具体的な提案を考えていますか？",
+                  "answer": "自動化システムの導入やスタッフ配置の最適化で人時生産性を高める提案をします。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "削減対象となる人件費の種類は何でしょうか？",
+                  "answer": "残業手当や臨時スタッフの雇用費用が主な削減対象になります。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの自動化ツールが人件費削減には効果的でしょうか？",
+                  "answer": "ピッキングロボットや自動梱包機など、手作業を代替できるツールが効果的です。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰がこれらの自動化ツールの導入を担当しますか？",
+                  "answer": "IT部門と現場管理者が連携してシステムを選定し、導入を担当します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの工程に自動化ツールを最初に導入すべきでしょうか？",
+                  "answer": "一番作業負荷の高いピッキング工程から導入するのが効果的です。"
+                }
+              ]
+            },
+            {
+              "childNode": "RI_A2 (新規取引先増)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "新規取引先を増やすには具体的にどのような提案をしますか？",
+                  "answer": "オンラインでの問い合わせ対応や無料サンプル発送キャンペーンなどを強化します。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "新規取引先に対して何をアピールする提案ですか？",
+                  "answer": "正確な在庫管理と迅速な配送を強みとしてアピールする方針です。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの業種の新規取引先を優先的に拡大したいですか？",
+                  "answer": "サプライチェーン管理に課題を抱えるメーカーや卸売業者を優先します。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰を中心に新規取引先向けのプロモーションを展開しますか？",
+                  "answer": "広報と営業チームが共同でオンラインプロモーションと展示会を展開します。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どこで新規取引先獲得のキャンペーンを実施する予定ですか？",
+                  "answer": "業界紙やBtoBプラットフォーム、展示会ブースなど多方面で実施します。"
+                }
+              ]
+            }
+          ],
+          "Depth5": [
+            {
+              "childNode": "CR_A3 (在庫ロス防止)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように在庫ロスを減らす提案を行いますか？",
+                  "answer": "在庫回転率をモニタリングするシステム導入と、定期的な棚卸しの徹底を提案します。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "在庫ロスを具体的に何％削減する目標をお持ちですか？",
+                  "answer": "まずは年間在庫ロスを30%削減することを目指しています。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どの製品カテゴリーを中心に在庫ロス防止策を講じるべきでしょうか？",
+                  "answer": "在庫回転が遅く、廃棄リスクの高い商品カテゴリから強化します。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が在庫ロス防止の施策を運用・管理しますか？",
+                  "answer": "在庫管理部門とシステム担当者が定期的に状況をチェックします。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの拠点で在庫ロスが最も深刻だと想定していますか？",
+                  "answer": "大型倉庫に在庫が集中しており、そこが最も深刻なロスを生み出しています。"
+                }
+              ]
+            },
+            {
+              "childNode": "RI_A3 (長期契約化によるLTV向上)",
+              "questions": [
+                {
+                  "questionType": "how",
+                  "question": "どのように長期契約化を促進する提案をしますか？",
+                  "answer": "契約内容にメンテナンスサービスや優待価格を組み込むことで長期契約を促します。"
+                },
+                {
+                  "questionType": "what",
+                  "question": "長期契約によるLTV向上の具体的な目標値はありますか？",
+                  "answer": "一社あたり年50万円の増収を目指しています。"
+                },
+                {
+                  "questionType": "which",
+                  "question": "どのようなサポートプログラムがLTV向上に効果的でしょうか？",
+                  "answer": "定期コンサルティングや故障時の優先対応が顧客ロイヤルティを高めます。"
+                },
+                {
+                  "questionType": "who",
+                  "question": "誰が長期契約のアップセルや交渉を行いますか？",
+                  "answer": "カスタマーサクセスチームと営業チームが連携して提案を行います。"
+                },
+                {
+                  "questionType": "where",
+                  "question": "どの段階で顧客に長期契約を提案するのが適切でしょうか？",
+                  "answer": "導入後の成果が見え始めた段階で提案するのが最も効果的です。"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+  
