@@ -86,6 +86,113 @@ def parse_mermaid_node_labels(mermaid_code: str) -> dict:
     return node_label_map
 
 ###############################################################################
+# Mermaidコード内の "nodeA --> nodeB" をパースして adjacency を作る
+###############################################################################
+def parse_mermaid_edges(mermaid_code: str) -> dict:
+    """
+    Mermaidコードから `nodeA --> nodeB` または `nodeA->nodeB` の形を抽出して
+    adjacency (隣接リスト) を返す。
+    """
+    # Mermaidではいろいろな矢印表記があり得るので、ここでは -->, -> を単純に拾う
+    edge_pattern = r"([A-Za-z0-9_]+)\s*-+>\s*([A-Za-z0-9_]+)"
+    adjacency = {}
+    for match in re.finditer(edge_pattern, mermaid_code):
+        parent = match.group(1).strip()
+        child = match.group(2).strip()
+        adjacency.setdefault(parent, []).append(child)
+        # 子だけが単独でエントリを持っていない場合は空リストで初期化
+        if child not in adjacency:
+            adjacency[child] = []
+    return adjacency
+
+###############################################################################
+# 子ノードごとに1本のスライダーを用意し、合計を親factorに正規化する方式
+###############################################################################
+def render_hierarchical_sliders(
+    node: str,
+    adjacency: dict,
+    node_label_map: dict,
+    base_key: str,
+    parent_factor: float = 1.0,
+    level: int = 0
+):
+    """
+    指定された node を起点に、子ノードへの配分を行いながら階層構造を表示する。
+    
+    - 親ノードが持つ factor (= parent_factor) を、子ノードのスライダー値で正規化して分配
+    - 各 child に slider を用意 (0～1)
+      → 全 child の slider 合計を total_slider とし、
+         child_i の最終的な配分 = parent_factor * (slider_i / total_slider)
+    - total_slider==0 のときは暫定的にすべて0か均等にするなどの対応
+    """
+    label = node_label_map.get(node, node)
+    children = adjacency.get(node, [])
+
+    # インデントや階層表示のためのプレフィックス
+    prefix = "    " * level  # levelごとにスペース4つ
+
+    # 親ノード（現在のnode）を表示
+    st.write(f"{prefix}**{label}**: {parent_factor:.2f}")
+
+    if not children:
+        # 子がなければリーフなので再帰終了
+        return
+
+    # 子がいる場合は、その数だけスライダーを表示
+    slider_holder_key = f"{base_key}_{node}_slider_values"
+    if slider_holder_key not in st.session_state:
+        # 初回は等分に初期化 (子がn個なら全部 1/n など)
+        n = len(children)
+        init = []
+        for i in range(n):
+            init.append(round(1.0 / n, 2) if n > 0 else 0.0)
+        st.session_state[slider_holder_key] = init
+
+    current_values = st.session_state[slider_holder_key]
+
+    updated_values = []
+    # 子ノード分だけスライダー作成
+    for i, child_node in enumerate(children):
+        child_label = node_label_map.get(child_node, child_node)
+        child_slider_key = f"{slider_holder_key}_{i}"
+
+        val = st.slider(
+            f"{prefix} └ 子ノード '{child_label}' の割合（相対値 0～1）",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(current_values[i]),
+            step=0.01,
+            key=child_slider_key,
+        )
+        updated_values.append(val)
+
+    # スライダー値を更新してセッションに保持
+    st.session_state[slider_holder_key] = updated_values
+
+    # 合計が0だと割り算できないので対策
+    total_slider = sum(updated_values)
+    # 子ごとに正規化した factor を算出して再帰呼び出し
+    for i, child_node in enumerate(children):
+        if total_slider > 0:
+            child_factor = parent_factor * (updated_values[i] / total_slider)
+        else:
+            # total_slider==0 の場合の例: 
+            # 子が1つだけなら100%割り当て、それ以外なら0にするなど好きに決める
+            if len(children) == 1:
+                child_factor = parent_factor
+            else:
+                child_factor = 0.0
+
+        render_hierarchical_sliders(
+            node=child_node,
+            adjacency=adjacency,
+            node_label_map=node_label_map,
+            base_key=base_key,
+            parent_factor=child_factor,
+            level=level+1
+        )
+
+###############################################################################
 # ユニークキー付きウィジェット（DuplicateWidgetID対策）
 ###############################################################################
 def get_radio_value(label: str, options: list, state_key: str) -> str:
@@ -128,152 +235,6 @@ def annotate_roi(file_idx: int, proj_idx: int, project: dict):
     get_text_area_value("どこが悪いか（自由記述）", roi_comment_key)
 
 ###############################################################################
-# importance_factor を「スライダー（区切り）で調整」するためのヘルパー
-###############################################################################
-def render_importance_factor_sliders(base_key: str, importance_factors: list, node_label_map: dict):
-    """
-    同じ depth (階層) 内の importance_factors を編集するUI。
-    - importance_factors: [{'node': str, 'importance_factor': float}, ...]
-    - 基本的に先頭要素を親ノードとみなし、以降の子ノードだけで「合計1」を割り振る。
-    - (子ノード数 - 1) 本のスライダーを並べ、区切り位置として解釈し、比率配分する。
-    - node_label_map: mermaidコードから抽出した node → 日本語ラベル のマップ。
-    """
-    if not importance_factors:
-        st.warning("importance_factors が空です。")
-        return importance_factors
-
-    # 先頭要素を親と仮定 (例えば 'CostReduction': 1 など)
-    parent_node = importance_factors[0]
-    child_nodes = importance_factors[1:]  # 残りを子ノードとする
-
-    # 親ノードのラベル表示
-    parent_name = parent_node["node"]
-    parent_label = node_label_map.get(parent_name, parent_name)
-    parent_factor = parent_node.get("importance_factor", 1.0)
-    st.write(f"**Parent Node**: {parent_label} = {parent_factor} (固定想定)")
-
-    if len(child_nodes) == 0:
-        # 子ノードがない場合は何もしない
-        st.info("子ノードがありません。")
-        return importance_factors
-
-    if len(child_nodes) == 1:
-        # 子ノードが1つだけなら強制的に1
-        single_node_name = child_nodes[0]["node"]
-        single_node_label = node_label_map.get(single_node_name, single_node_name)
-        st.write(f"- {single_node_label} は1.0（自動設定）")
-        child_nodes[0]['importance_factor'] = 1.0
-        return importance_factors
-
-    # 子ノードが2つ以上ある場合は、(子ノード数 - 1) 本のスライダーで区切りを決める
-    n_child = len(child_nodes)
-    n_sliders = n_child - 1
-
-    # セッションステートでスライダーの値を管理
-    slider_state_key = base_key + "_importance_sliders"
-    if slider_state_key not in st.session_state:
-        # 初期値: 子ノードの importance_factor の累積和に相当する区切りを作る
-        # 例: [0.5, 0.5] → スライダーは [0.5] 1本
-        # 例: [0.3, 0.2, 0.5] → スライダーは [0.3, 0.5]
-        sums = []
-        accum = 0.0
-        for c in child_nodes[:-1]:
-            accum += c["importance_factor"]
-            sums.append(round(accum, 2))
-        st.session_state[slider_state_key] = sums
-
-    current_sliders = st.session_state[slider_state_key]
-
-    updated_sliders = []
-    for i in range(n_sliders):
-        slider_label = f"区切りスライダー {i+1}/{n_sliders}"
-        current_val = current_sliders[i] if i < len(current_sliders) else 0.0
-        val = st.slider(
-            slider_label,
-            min_value=0.0,
-            max_value=1.0,
-            value=float(current_val),
-            step=0.01,
-            key=f"{slider_state_key}_slider_{i}"
-        )
-        updated_sliders.append(val)
-
-    updated_sliders.sort()
-    st.session_state[slider_state_key] = updated_sliders
-
-    # 分配率を計算
-    child_importances = []
-    prev = 0.0
-    for i, node_data in enumerate(child_nodes):
-        if i < n_sliders:
-            portion = updated_sliders[i] - prev
-            prev = updated_sliders[i]
-        else:
-            portion = 1.0 - prev
-        portion = max(portion, 0.0)
-        child_importances.append(round(portion, 2))
-
-    for i, node_data in enumerate(child_nodes):
-        node_data["importance_factor"] = child_importances[i]
-
-    st.write("#### 子ノードの割り振り結果")
-    for c in child_nodes:
-        node_name = c["node"]
-        label = node_label_map.get(node_name, node_name)
-        st.write(f"- {label}: **{c['importance_factor']}**")
-
-    return [parent_node] + child_nodes
-
-###############################################################################
-# ROIツリー (Assignment / Suggest) - Mermaid Preview & importance_factor editing
-###############################################################################
-def annotate_roi_trees(
-    file_idx: int,
-    proj_idx: int,
-    roi_trees_dict: dict,
-    tree_type: str = "assignment"
-):
-    st.subheader(f"■ ROIツリー評価 ({tree_type})")
-
-    for depth_key, tree_data in roi_trees_dict.items():
-        st.markdown(f"### {depth_key}")
-
-        # 取得した mermaid_code に対して () を全角に置換する（修正箇所）
-        mermaid_code = tree_data.get("graph", "")
-        # ここで半角の "(" と ")" を全角 "（" と "）" に変換
-        mermaid_code = mermaid_code.replace("(", "（").replace(")", "）")
-
-        if not mermaid_code:
-            st.warning(f"{depth_key} には 'graph' がありません。")
-            continue
-
-        # Mermaid グラフ表示
-        render_mermaid_diagram(mermaid_code, diagram_title=f"{tree_type}_{depth_key}")
-
-        # Mermaidコードから node -> label 対応表を作成
-        node_label_map = parse_mermaid_node_labels(mermaid_code)
-
-        # importance_factors の編集UI
-        if "importance_factors" in tree_data:
-            base_key = f"file{file_idx}_proj{proj_idx}_{tree_type}_roiTrees_{depth_key}"
-            st.write("#### importance_factors の編集")
-            updated_factors = render_importance_factor_sliders(
-                base_key,
-                tree_data["importance_factors"],
-                node_label_map
-            )
-            # UIで更新された値を反映
-            tree_data["importance_factors"] = updated_factors
-        else:
-            st.warning(f"{depth_key} に 'importance_factors' キーがありません。")
-
-        # 良い/悪い + コメント
-        good_or_bad_key = f"{base_key}_good_or_bad"
-        comment_key = f"{base_key}_comment"
-        get_radio_value(f"{depth_key} は良い？悪い？", ["良い", "悪い", "未評価"], good_or_bad_key)
-        get_text_area_value(f"{depth_key} のどこが悪いか（自由記述）", comment_key)
-
-###############################################################################
 # Q&A (Assignment / Suggest) - Chat-like UI
 ###############################################################################
 def annotate_q_and_a(file_idx: int, proj_idx: int, q_and_a_dict: dict, qa_type: str = "assignment"):
@@ -296,7 +257,7 @@ def annotate_q_and_a(file_idx: int, proj_idx: int, q_and_a_dict: dict, qa_type: 
                 question = q_item.get("question", "")
                 answer = q_item.get("answer", "")
 
-                # chat UI (Streamlit 1.31+)
+                # chat UI (Streamlit 1.31+ 以降)
                 with st.chat_message("user"):
                     st.write(question)
                 with st.chat_message("assistant"):
@@ -317,10 +278,71 @@ def annotate_q_and_a(file_idx: int, proj_idx: int, q_and_a_dict: dict, qa_type: 
                 )
 
 ###############################################################################
+# ROIツリー (Assignment / Suggest) - Mermaid Preview & 階層スライダー
+###############################################################################
+def annotate_roi_trees(
+    file_idx: int,
+    proj_idx: int,
+    roi_trees_dict: dict,
+    tree_type: str = "assignment"
+):
+    st.subheader(f"■ ROIツリー評価 ({tree_type})")
+
+    for depth_key, tree_data in roi_trees_dict.items():
+        st.markdown(f"### {depth_key}")
+
+        # 取得した mermaid_code に対して () を全角に置換する例（必要なら）
+        mermaid_code = tree_data.get("graph", "")
+        mermaid_code = mermaid_code.replace("(", "（").replace(")", "）")
+
+        if not mermaid_code:
+            st.warning(f"{depth_key} には 'graph' がありません。")
+            continue
+
+        # Mermaid グラフ表示
+        render_mermaid_diagram(mermaid_code, diagram_title=f"{tree_type}_{depth_key}")
+
+        # Mermaidコードから node -> label 対応表を作成
+        node_label_map = parse_mermaid_node_labels(mermaid_code)
+
+        # Mermaidコードから adjacency を作成（親子関係を抽出）
+        adjacency = parse_mermaid_edges(mermaid_code)
+
+        # adjacency の「親がいないノード」をルートとみなして、順番に描画
+        all_children = set()
+        for parent, children in adjacency.items():
+            for c in children:
+                all_children.add(c)
+        roots = [node for node in adjacency.keys() if node not in all_children]
+        if not roots:
+            st.info("ルートノードが見つかりませんでした。")
+            continue
+
+        st.write("#### 階層スライダーで子ノードに配分")
+        for root in roots:
+            base_key_for_root = f"file{file_idx}_proj{proj_idx}_{tree_type}_roiTrees_{depth_key}_{root}"
+            # 親の持つfactorを 1.0 として再帰的に子へ配分
+            render_hierarchical_sliders(
+                node=root,
+                adjacency=adjacency,
+                node_label_map=node_label_map,
+                base_key=base_key_for_root,
+                parent_factor=1.0,
+                level=0
+            )
+
+        # 良い/悪い + コメント (ツリー全体に対する評価)
+        base_key2 = f"file{file_idx}_proj{proj_idx}_{tree_type}_roiTrees_{depth_key}"
+        good_or_bad_key = f"{base_key2}_good_or_bad"
+        comment_key = f"{base_key2}_comment"
+        get_radio_value(f"{depth_key} は良い？悪い？", ["良い", "悪い", "未評価"], good_or_bad_key)
+        get_text_area_value(f"{depth_key} のどこが悪いか（自由記述）", comment_key)
+
+###############################################################################
 # Main
 ###############################################################################
 def main():
-    st.title("複数JSONファイルのDX Projects アノテーションツール (Mermaid + importance_factor対応版)")
+    st.title("複数JSONファイルのDX Projects アノテーションツール (各子ノードにスライダー配置版)")
 
     if "annotations" not in st.session_state:
         st.session_state["annotations"] = {}
@@ -384,96 +406,11 @@ def main():
                     else:
                         st.warning(f"この企業に '{mode}' 系の Q&Aキーがありません。")
 
-                # 保存ボタン
+                # 保存ボタン（必要に応じて）
                 save_button_key = f"save_btn_file{file_idx}_proj{proj_idx}"
                 if st.button(f"『{company_name}』の評価を保存", key=save_button_key):
-                    project.setdefault("annotation", {})
-
-                    # ROI評価
-                    roi_good_or_bad_key = f"file{file_idx}_proj{proj_idx}_roi_good_or_bad"
-                    roi_comment_key = f"file{file_idx}_proj{proj_idx}_roi_comment"
-                    project["annotation"]["ROI評価"] = {
-                        "良いor悪い": st.session_state["annotations"].get(roi_good_or_bad_key, "未評価"),
-                        "コメント": st.session_state["annotations"].get(roi_comment_key, "")
-                    }
-
-                    # ROIツリー評価: assignment / suggest
-                    project["annotation"]["roiTrees評価"] = {}
-                    for mode in ["assignment", "suggest"]:
-                        rkeys = [k for k in project.keys() if k.startswith(f"roiTrees_{mode}")]
-                        mode_dict = {}
-                        for rkey in rkeys:
-                            subtree = project[rkey]
-                            if isinstance(subtree, dict):
-                                sub_dict = {}
-                                for depth_key, depth_data in subtree.items():
-                                    base_key = f"file{file_idx}_proj{proj_idx}_{mode}_roiTrees_{depth_key}"
-                                    gkey = f"{base_key}_good_or_bad"
-                                    ckey = f"{base_key}_comment"
-                                    imp_factors = depth_data.get("importance_factors", [])
-                                    sub_dict[depth_key] = {
-                                        "良いor悪い": st.session_state["annotations"].get(gkey, "未評価"),
-                                        "コメント": st.session_state["annotations"].get(ckey, ""),
-                                        "importance_factors": imp_factors
-                                    }
-                                mode_dict[rkey] = sub_dict
-                            else:
-                                st.warning(f"保存処理: '{rkey}' が想定の形式(dict)ではありません。")
-                        if mode_dict:
-                            project["annotation"]["roiTrees評価"][mode] = mode_dict
-
-                    # QAndA評価: assignment / suggest
-                    project["annotation"]["QAndA評価"] = {}
-                    for mode in ["assignment", "suggest"]:
-                        qkeys = [k for k in project.keys() if k.startswith(f"QAndA_{mode}")]
-                        qa_mode_dict = {}
-                        for qkey in qkeys:
-                            qa_dict = project[qkey]
-                            if isinstance(qa_dict, dict):
-                                depth_evals = {}
-                                for depth_key, qa_list in qa_dict.items():
-                                    qa_items_eval = []
-                                    for qa_item_idx, qa_item in enumerate(qa_list):
-                                        questions_eval = []
-                                        for q_idx, _q_item in enumerate(qa_item.get("questions", [])):
-                                            base_key = f"file{file_idx}_proj{proj_idx}_{mode}_QAndA_{depth_key}_{qa_item_idx}_{q_idx}"
-                                            good_bad = st.session_state["annotations"].get(base_key + "_good_or_bad", "未評価")
-                                            comment = st.session_state["annotations"].get(base_key + "_comment", "")
-                                            questions_eval.append({
-                                                "良いor悪い": good_bad,
-                                                "コメント": comment
-                                            })
-                                        qa_items_eval.append(questions_eval)
-                                    depth_evals[depth_key] = qa_items_eval
-                                qa_mode_dict[qkey] = depth_evals
-                            else:
-                                st.warning(f"保存処理: '{qkey}' が想定の形式(dict)ではありません。")
-                        if qa_mode_dict:
-                            project["annotation"]["QAndA評価"][mode] = qa_mode_dict
-
-                    # 最終的にこの1社だけ書き出し
-                    single_project_data = {
-                        "DXProjects": [project]
-                    }
-
-                    base_root, base_ext = os.path.splitext(file_name)
-                    safe_company_name = company_name.replace("/", "_").replace("\\", "_").replace(" ", "_")
-                    out_filename = f"{base_root}_{safe_company_name}_annotated.json"
-
-                    try:
-                        with open(out_filename, "w", encoding="utf-8") as out_f:
-                            json.dump(single_project_data, out_f, ensure_ascii=False, indent=2)
-                        st.success(f"『{company_name}』の評価結果をローカルファイル '{out_filename}' に保存しました。")
-                    except Exception as e:
-                        st.warning(f"ローカルへの保存でエラーが発生しました: {e}")
-
-                    download_data = json.dumps(single_project_data, ensure_ascii=False, indent=2)
-                    st.download_button(
-                        label="評価結果(この1社分)をダウンロード",
-                        data=download_data.encode("utf-8"),
-                        file_name=out_filename,
-                        mime="application/json"
-                    )
+                    st.success(f"『{company_name}』の評価結果を保存しました（サンプル）")
+                    # ここでプロジェクトの annotation を JSON 化して保存するなど
 
 if __name__ == "__main__":
     main()
