@@ -1,0 +1,1174 @@
+{
+  "DXProjects": [
+    {
+      "table": {
+        "企業名": "A社",
+        "課題・目的": "複数店舗を運営する小売業で、店舗ごとの在庫管理や補充発注が手作業で行われており、人件費が高騰している（コスト削減のみ）",
+        "提案": "自動発注システム＋RFIDによる在庫管理を導入し、在庫補充業務や棚卸し工数を削減する",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "店舗ごとの在庫カウント作業：現状1日8時間×20日=160時間/月×10店舗=月1,600時間",
+          "自動発注により在庫ロス（過剰在庫・品切れ）を最小化",
+          "在庫管理担当のスタッフ数：現状3名→導入後1名体制を目指す"
+        ],
+        "ROI算定": [
+          "工数削減：月1,600時間→800時間に半減（1日8時間×20日=160時間/月の5人月分相当）",
+          "時給換算3,000円の場合、月240万円→120万円の人件費削減（年間1,440万円削減）"
+        ]
+      },
+      "roiTrees_assignment_cost_only": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減（在庫管理工数削減）]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減(在庫管理工数削減)]\n            CR_A1 --> CR_A2[在庫ロス削減(過剰在庫・品切れ防止)]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A2",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減(在庫管理工数削減)]\n            CR_A1 --> CR_A2[在庫ロス削減(過剰在庫・品切れ防止)]\n                CR_A2 --> CR_A3[外注費用の最適化(棚卸し代行などの削減)]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A2",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A3",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_cost_only": {
+        "Depth3": [
+          {
+            "parentNode": "CostReduction",
+            "childNode": "CR_A1 (人件費削減)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやってコストを下げるのですか？",
+                "answer": "在庫管理にかかる作業時間を減らし、人件費を圧縮する方針です。"
+              },
+              {
+                "questionType": "what",
+                "question": "コスト増の大きな要因は何ですか？",
+                "answer": "手作業による棚卸しや補充発注の管理が、大きな工数を生んでいます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの部分を優先的に削減しますか？",
+                "answer": "在庫数の確認と補充発注の工程を最初に省力化します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこの削減施策を推進しますか？",
+                "answer": "店舗オペレーション担当と本社IT部門が主導します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで最もコストがかかっていますか？",
+                "answer": "複数店舗の在庫をそれぞれ手動で管理している点がコストの中心です。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "CR_A1",
+            "childNode": "CR_A2 (在庫ロス削減)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "在庫ロスはどのように減らせるのですか？",
+                "answer": "リアルタイムの在庫把握と自動発注により、過剰在庫や品切れを抑制できます。"
+              },
+              {
+                "questionType": "what",
+                "question": "過剰在庫や品切れによる影響は何ですか？",
+                "answer": "無駄な保管コストや機会損失、また処分費用が発生します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのカテゴリの商品が在庫ロスにつながりやすいですか？",
+                "answer": "鮮度管理が必要な食品やトレンドの移り変わりが早いアパレル商品などです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が在庫ロスの監視を行いますか？",
+                "answer": "各店舗の在庫担当者と本社の需給管理チームが行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで在庫ロスが顕在化しますか？",
+                "answer": "売れ残りや返品が集中する店舗でロスが大きくなりがちです。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "CR_A2",
+            "childNode": "CR_A3 (外注費用の最適化)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって外注費用を削減するのですか？",
+                "answer": "自社での在庫自動管理システムを強化し、棚卸し代行などを最小限に抑えます。"
+              },
+              {
+                "questionType": "what",
+                "question": "外注に頼るコストが発生する原因は何でしょうか？",
+                "answer": "多店舗を一括で管理しきれず、外部に棚卸し作業を依頼しているためです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのタイミングで外注費用がかかるのですか？",
+                "answer": "繁忙期や棚卸し時期など、人手が不足するタイミングです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が外注費用の最適化プランを立案しますか？",
+                "answer": "経営企画部と各店舗のオペレーション管理者が共同で策定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで外注費用が最も多く発生しますか？",
+                "answer": "店舗数の多い地域や、人員確保が難しいエリアで外注コストが増大しやすいです。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_cost_only": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_S1[在庫管理の自動化(RFID導入)]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_S1[在庫管理の自動化(RFID導入)]\n            CR_S1 --> CR_S2[自動発注システムの導入]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S2",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_S1[在庫管理の自動化(RFID導入)]\n            CR_S1 --> CR_S2[自動発注システムの導入]\n                CR_S2 --> CR_S3[各店舗のスタッフ配置最適化]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S2",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_S3",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_cost_only": {
+        "Depth3": [
+          {
+            "childNode": "CR_S1 (在庫管理の自動化)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって在庫管理を自動化してコストを下げるのですか？",
+                "answer": "RFIDタグを使った一括読み取りで、手動スキャンや目視チェックを削減します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何のシステムを導入しようと考えていますか？",
+                "answer": "商品の入出庫を自動的に記録できる在庫管理ソフトをRFIDと連携します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのエリアから導入を始めますか？",
+                "answer": "まずは在庫回転率の高い店舗から順次導入します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこの在庫管理システムを運用しますか？",
+                "answer": "店舗スタッフと本社のIT部門が共同で運用を担当します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで導入効果が一番高いですか？",
+                "answer": "月の売上が大きく在庫動きの激しい大型店舗で効果が高いです。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "CR_S2 (自動発注システムの導入)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "自動発注システムをどう活用してコストを下げるのですか？",
+                "answer": "在庫数と販売実績を自動連動させ、無駄な発注や在庫切れを防ぐことで工数と在庫ロスを減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんな機能が必要ですか？",
+                "answer": "販売予測とリアルタイム在庫を照合して適正な発注数を算出できる機能が必要です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのようなデータ連携が想定されますか？",
+                "answer": "POSシステムの販売データと在庫管理システムをAPIで連携させます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が発注承認を最終的に行いますか？",
+                "answer": "本社の需給管理担当者が自動発注の内容を確認・承認します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでシステム導入の予算を確保しますか？",
+                "answer": "IT投資枠から開発費用とライセンス費用を捻出します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "CR_S3 (各店舗のスタッフ配置最適化)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "スタッフ配置を最適化してコストを削減するにはどうすればいいですか？",
+                "answer": "自動化で削減した作業を踏まえて、店舗ごとの人員を必要最小限に再配置します。"
+              },
+              {
+                "questionType": "what",
+                "question": "最適化するときにどんな指標を使いますか？",
+                "answer": "在庫補充作業時間やレジ作業量などの稼働データを活用します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの店舗から配置見直しを進めますか？",
+                "answer": "作業が集中している都市型店舗から優先的に見直します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が配置転換の決定を行いますか？",
+                "answer": "人事部と各店舗マネージャーが調整して決定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで配置最適化が一番効果を発揮しますか？",
+                "answer": "作業量とピークタイムに偏りがある店舗で特に効果が高いです。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "table": {
+        "企業名": "B社",
+        "課題・目的": "オンライン受注システムの導入が遅れており、問い合わせ対応に追われて新規顧客開拓に時間を割けない（売上増のみ）",
+        "提案": "顧客ポータルサイト＋チャットボットの導入で問い合わせを低減し、営業が新規顧客アプローチに注力できる体制へ",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "問い合わせ対応時間：現状月800時間（1人8h×20日=160hの5人月分）",
+          "新規顧客アプローチ件数：現状月200件→導入後月350件を目標",
+          "問い合わせ削減により営業スタッフ1名分を新規開拓へ再配置"
+        ],
+        "ROI算定": [
+          "新規顧客獲得効果：問い合わせ削減→新規開拓工数＋75%増（結果的に売上を10〜20%増を目指す）",
+          "問い合わせ工数削減効果：月800時間→400時間に削減（残り400時間を新規営業に回せる）"
+        ]
+      },
+      "roiTrees_assignment_revenue_only": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[新規顧客開拓数の増加]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[新規顧客開拓数の増加]\n            RI_B1 --> RI_B2[既存顧客への追加提案数増]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B2",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[新規顧客開拓数の増加]\n            RI_B1 --> RI_B2[既存顧客への追加提案数増]\n                RI_B2 --> RI_B3[LTV向上(顧客生涯価値の拡大)]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B2",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B3",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_revenue_only": {
+        "Depth3": [
+          {
+            "parentNode": "RevenueIncrease",
+            "childNode": "RI_B1 (新規顧客開拓数の増加)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって売上を増やそうと考えていますか？",
+                "answer": "問い合わせ対応をチャットボットに任せ、その分新規顧客開拓に注力します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が現在の売上停滞の主な要因でしょうか？",
+                "answer": "既存顧客からの問い合わせ対応に追われ、新規開拓が十分にできていないことです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのターゲットから先にアプローチしますか？",
+                "answer": "既存事業と親和性の高い業界の新規顧客を優先します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が新規顧客開拓を担当しますか？",
+                "answer": "カスタマーサポートから営業部門へ一部リソースをシフトして、専任チームが担当します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで新規顧客を見つけるのですか？",
+                "answer": "オンラインの見込み客リストや展示会でのリード獲得を活用します。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "RI_B1",
+            "childNode": "RI_B2 (既存顧客への追加提案数増)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって既存顧客への追加提案を増やしますか？",
+                "answer": "問い合わせ削減で生まれた時間を活用して、顧客データ分析とフォローアップ提案を強化します。"
+              },
+              {
+                "questionType": "what",
+                "question": "具体的にはどのような提案をするのですか？",
+                "answer": "アップセルやクロスセルの提案を行い、一顧客あたりの購買単価を上げます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客セグメントに注力しますか？",
+                "answer": "購買頻度が高く、追加製品を導入しやすい企業が中心です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこの提案活動をリードしますか？",
+                "answer": "営業チームとマーケティングチームが連携して実施します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで顧客データを分析するのですか？",
+                "answer": "CRMシステム上で購買履歴や問い合わせ履歴を一元管理し、分析を行います。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "RI_B2",
+            "childNode": "RI_B3 (LTV向上)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって顧客生涯価値を伸ばすのですか？",
+                "answer": "継続利用を促すサブスクリプションモデルや定期購入プランなどを強化します。"
+              },
+              {
+                "questionType": "what",
+                "question": "LTVを上げるために必要な施策は何ですか？",
+                "answer": "顧客満足度向上策と追加提案の定期実施、契約更新率の向上が重要です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客カテゴリーが特にLTVが高いですか？",
+                "answer": "定期的に大量注文を行う大口顧客や長期契約が見込める法人顧客です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がLTV向上プログラムを運用しますか？",
+                "answer": "カスタマーサクセスチームが中心となり、マーケティング部門と協力して運用します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで契約更新率をチェックしますか？",
+                "answer": "顧客管理システム内で契約更新予定日のリストを管理し、アラートを出しています。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_revenue_only": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_S1[チャットボット導入による問い合わせ対応の自動化]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_S1[チャットボット導入による問い合わせ対応の自動化]\n            RI_S1 --> RI_S2[顧客ポータルサイト構築]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S2",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_S1[チャットボット導入による問い合わせ対応の自動化]\n            RI_S1 --> RI_S2[顧客ポータルサイト構築]\n                RI_S2 --> RI_S3[営業リソース再配置(新規開拓強化)]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S2",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_S3",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_revenue_only": {
+        "Depth3": [
+          {
+            "childNode": "RI_S1 (チャットボット導入による問い合わせ対応の自動化)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって問い合わせ対応を自動化して売上を伸ばすのですか？",
+                "answer": "顧客の基本的な問い合わせをチャットボットで対応し、営業担当が新規開拓や高度な提案に集中できるようにします。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんな問い合わせが主に自動化できますか？",
+                "answer": "よくあるFAQや受注ステータス確認など、定型的な問い合わせが対象です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのチャットボットサービスを検討していますか？",
+                "answer": "既存CRMと連携可能なクラウド型チャットボットを導入予定です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がチャットボットのコンテンツを作成しますか？",
+                "answer": "サポート部門とマーケティング部門がQ&Aデータベースを共同で作成します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでチャットボットを利用できるようにしますか？",
+                "answer": "自社のウェブサイトと顧客ポータルサイト内で利用可能にします。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "RI_S2 (顧客ポータルサイト構築)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "顧客ポータルサイトをどう活用して売上を伸ばすのですか？",
+                "answer": "顧客が必要な情報を自己完結できるようにし、問い合わせ対応の負荷を減らすことで営業リソースを拡充します。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんな機能をポータルサイトに実装しますか？",
+                "answer": "注文履歴確認、FAQ検索、チャットボット連携、追加サービスの申込機能などを予定しています。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客層がポータルサイトを主に利用しますか？",
+                "answer": "BtoBの法人顧客が中心ですが、一般消費者向けにも拡張可能です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がポータルサイトの管理を担当しますか？",
+                "answer": "IT部門とカスタマーサポート部門が共同で運用管理します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでポータルサイトの開発を行いますか？",
+                "answer": "外部の開発ベンダーに委託し、社内担当と連携して進めます。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "RI_S3 (営業リソース再配置)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "営業リソースを再配置して売上を伸ばすにはどうすればいいですか？",
+                "answer": "問い合わせ対応から解放された営業が、新規顧客・既存顧客への提案活動を強化し、売上拡大を図ります。"
+              },
+              {
+                "questionType": "what",
+                "question": "具体的にどんな提案活動を強化しますか？",
+                "answer": "アップセルやクロスセル、定期契約の提案など、顧客ニーズに合わせた活動を行います。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのように営業の優先順位をつけますか？",
+                "answer": "潜在顧客の重要度や既存顧客の購買実績を元にアプローチ順を決定します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が営業再配置の方針を決めますか？",
+                "answer": "営業部長と経営企画部が協議して方針を策定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで商談や提案活動を強化しますか？",
+                "answer": "オンライン商談ツールを活用し、地域に限定されない形で提案機会を増やします。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "table": {
+        "企業名": "C社",
+        "課題・目的": "自社工場の稼働率が不安定でコストが高い一方、需要に追いつけず売上機会を逃している（コスト削減と売上増の複合）",
+        "提案": "工場の稼働管理システム＋需要予測AIを導入し、生産計画を最適化して安定稼働と出荷量拡大を両立する",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "工場の残業時間：現状月1,000時間→導入後月500時間を目標",
+          "生産ロット最適化により稼働率を向上（現状60%→70%以上）",
+          "需要予測精度を高め、欠品による売上機会損失を防ぐ（売上5〜10%増を狙う）"
+        ],
+        "ROI算定": [
+          "コスト削減効果：残業代削減 月1,000時間→500時間（時給4,000円換算で月200万円→100万円）",
+          "売上増加効果：需要を逃さず受注できる体制構築で年率5〜10%の売上増が期待"
+        ]
+      },
+      "roiTrees_assignment_cost_and_revenue": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n    利益 --> RevenueIncrease[売上増加]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_C1[残業代削減]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_C1[需要予測精度向上]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減]\n        CostReduction --> CR_C1[残業代削減]\n            CR_C1 --> CR_C2[設備稼働率向上(シフト最適化)]\n    利益 --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_C1[需要予測精度向上]\n            RI_C1 --> RI_C2[欠品防止による売上機会確保]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_C2",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C2",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_cost_and_revenue": {
+        "Depth3": [
+          {
+            "parentNode": "Gain",
+            "childNode": "CostReduction (コスト削減)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやってコストを削減しようと考えているのですか？",
+                "answer": "工場の稼働計画を見直し、残業や余剰人員を削減します。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんなコストが一番大きな負担になっていますか？",
+                "answer": "急な需要に対応するための残業代や非効率な稼働に伴う設備コストです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの工程が一番コストを生み出していますか？",
+                "answer": "人の手作業が多い組立工程と、稼働率の低い設備がある工程です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がコスト削減の施策を実行しますか？",
+                "answer": "生産管理部門と工場長が中心となり、全体を統括します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで最もコスト削減の余地があると思いますか？",
+                "answer": "過剰稼働や段取り替えが頻発しているラインが削減余地大です。"
+              }
+            ]
+          },
+          {
+            "parentNode": "Gain",
+            "childNode": "RevenueIncrease (売上増加)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって売上を伸ばそうと考えているのですか？",
+                "answer": "需要予測精度を高め、生産計画を最適化して欠品を防ぎ、受注機会を逃さないようにします。"
+              },
+              {
+                "questionType": "what",
+                "question": "現在、売上を逃してしまう原因は何ですか？",
+                "answer": "欠品やリードタイムの遅れが顧客満足度を下げ、受注を取りこぼすことです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの製品ラインで売上増が期待できますか？",
+                "answer": "需要変動が大きく、これまでは機会損失が多かった製品ラインです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が売上増に向けた施策を主導しますか？",
+                "answer": "営業部門と生産管理部門が連携して、最適な受注・生産計画を組みます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで売上を伸ばす余地があると考えられますか？",
+                "answer": "需要の予測精度が低かった市場や、新規顧客への対応に力を入れる領域です。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "CostReduction",
+            "childNode": "CR_C1 (残業代削減)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのように残業代を削減する計画ですか？",
+                "answer": "シフト計画を最適化し、ピーク時の対応を効率化することで残業を抑制します。"
+              },
+              {
+                "questionType": "what",
+                "question": "残業が多くなる主な原因は何でしょうか？",
+                "answer": "需要変動が読めず、急なオーダーに対応するために人員を長時間稼働させていることです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの部署で特に残業が多いですか？",
+                "answer": "加工工程と組立工程を担当する製造ラインで残業が発生しやすいです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が残業削減のスケジュールを管理しますか？",
+                "answer": "工場長と生産管理リーダーが生産計画の調整と人員配置を管理します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで稼働計画の見直しを行いますか？",
+                "answer": "工場内の生産管理システム上で、需要予測を基にした稼働シミュレーションを実施します。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RevenueIncrease",
+            "childNode": "RI_C1 (需要予測精度向上)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "需要予測精度を上げるにはどうすればいいですか？",
+                "answer": "過去の販売データや市場情報をAIで解析し、より細かい需要変動を捉えます。"
+              },
+              {
+                "questionType": "what",
+                "question": "需要予測が外れるとどんな問題が起きますか？",
+                "answer": "過剰在庫や欠品が発生し、コスト増や売上機会損失につながります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのようなデータが予測に必要ですか？",
+                "answer": "季節要因やキャンペーン情報、競合状況なども含めた総合的なデータが必要です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が需要予測モデルを構築・運用しますか？",
+                "answer": "データ分析チームとIT部門が連携し、経営企画が最終判断を行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで予測結果を生かして生産計画に反映させますか？",
+                "answer": "生産管理システムに直接連携し、即時にライン稼働計画を調整します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "CR_C1",
+            "childNode": "CR_C2 (設備稼働率向上)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "設備稼働率を向上させるためにはどうしたらいいですか？",
+                "answer": "シフトを最適化し、稼働が少ない時間帯にメンテナンスを行うなど段取りを工夫します。"
+              },
+              {
+                "questionType": "what",
+                "question": "稼働率が低い主な原因は何ですか？",
+                "answer": "需要の読みにくさと段取り替えの多さで、機械が止まる時間が長いことです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの設備の稼働率が特に低いですか？",
+                "answer": "多品種対応が必要な汎用設備の稼働率が低い傾向にあります。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が稼働率の管理を行いますか？",
+                "answer": "生産管理チームが稼働データを集計し、設備保全チームと連携して改善を進めます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで稼働率向上の効果が大きく期待できますか？",
+                "answer": "高額設備が複数稼働するラインで、少しの稼働率向上でもコスト削減効果が大きいです。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RI_C1",
+            "childNode": "RI_C2 (欠品防止による売上機会確保)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって欠品を防いで売上機会を確保しますか？",
+                "answer": "需要予測AIを利用し、生産量を事前に最適化しておくことで欠品を減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "欠品が続くとどんなリスクがありますか？",
+                "answer": "顧客離れやブランドイメージの低下など、長期的な売上減につながります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの製品の欠品が特に影響が大きいですか？",
+                "answer": "主力製品や季節需要の高い商品の欠品が大きく売上に影響します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が欠品リスクをモニターしますか？",
+                "answer": "在庫管理チームと営業部門が需要と供給のギャップを常にモニターします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで需要と供給の調整を行いますか？",
+                "answer": "生産管理システムと販売管理システムを連動させ、リアルタイムで計画を修正します。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_cost_and_revenue": {
+        "depth3": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減策]\n    利益 --> RevenueIncrease[売上増加策]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減策]\n        CostReduction --> CR_Cs1[シフト最適化システム導入]\n    利益 --> RevenueIncrease[売上増加策]\n        RevenueIncrease --> RI_Cs1[需要予測AI導入]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_Cs1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_Cs1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    利益[Gain]\n    利益 --> CostReduction[コスト削減策]\n        CostReduction --> CR_Cs1[シフト最適化システム導入]\n            CR_Cs1 --> CR_Cs2[設備稼働監視IoTの導入]\n    利益 --> RevenueIncrease[売上増加策]\n        RevenueIncrease --> RI_Cs1[需要予測AI導入]\n            RI_Cs1 --> RI_Cs2[リアルタイム生産スケジューリング]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_Cs1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_Cs2",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_Cs1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_Cs2",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_cost_and_revenue": {
+        "Depth3": [
+          {
+            "childNode": "CostReduction (コスト削減策)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "コスト削減策をどのように実施していくのですか？",
+                "answer": "シフトや稼働計画の最適化システムを導入し、残業や無駄な稼働時間を減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "何を削減の対象と考えていますか？",
+                "answer": "主に残業代や設備の遊休時間から生じるコストを削減します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの工程で最も大きな削減効果が見込めますか？",
+                "answer": "組立工程や検品工程など、人件費の割合が高いセクションです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がシステム導入を担当しますか？",
+                "answer": "IT部門と生産管理部門が共同で要件定義と実装を行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこに導入することで即効性のある削減が期待できますか？",
+                "answer": "大規模かつ稼働変動の大きい工場ラインから順に導入します。"
+              }
+            ]
+          },
+          {
+            "childNode": "RevenueIncrease (売上増加策)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "売上増加策をどうやって進めるのですか？",
+                "answer": "需要予測AIなどの先端技術を導入し、欠品を防いで生産量を最適化します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が売上増の最大の鍵だと考えていますか？",
+                "answer": "受注機会を逃さないための迅速な生産・出荷体制構築が重要です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの製品群で特に売上拡大を目指しますか？",
+                "answer": "需要変動が大きく、従来は欠品が起こりやすかった主力製品群を強化します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこの売上増加策を管理しますか？",
+                "answer": "営業部門と経営企画が連携し、生産計画へのフィードバックを行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで需要予測や生産スケジューリングを行いますか？",
+                "answer": "クラウド上の生産管理プラットフォームを利用し、リアルタイムに行います。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "CR_Cs1 (シフト最適化システム導入)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "シフト最適化システムはどのようにコスト削減につながるのですか？",
+                "answer": "生産予定と人員配置を自動マッチングさせ、余剰人員や残業を最小化します。"
+              },
+              {
+                "questionType": "what",
+                "question": "具体的にどんな機能を備えていますか？",
+                "answer": "需要予測データと連動して日別・時間帯別に必要人数を算出する機能などです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの工場ラインから導入を始めますか？",
+                "answer": "繁忙期の変動が大きいラインを優先的に導入し、効果を検証します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がシフト最適化のルールを設定しますか？",
+                "answer": "生産管理チームと人事部門が労働規制やライン特性を踏まえてルールを策定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでシフト調整の結果を確認できますか？",
+                "answer": "工場内の端末や従業員向けアプリを通じてリアルタイムに確認可能です。"
+              }
+            ]
+          },
+          {
+            "childNode": "RI_Cs1 (需要予測AI導入)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "需要予測AIの導入で売上はどう伸びるのですか？",
+                "answer": "需要を正確に捉えることで欠品を防ぎ、機会損失を減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんなデータをAIに取り込みますか？",
+                "answer": "過去の販売実績、季節要因、キャンペーン情報、経済指標など多方面のデータを活用します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのアルゴリズムを利用する予定ですか？",
+                "answer": "時系列分析や機械学習を組み合わせたハイブリッドモデルを検討しています。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がモデルの精度を評価して改善しますか？",
+                "answer": "データサイエンティストと生産管理部門が共同で評価し、継続的にチューニングします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで予測結果が生産計画に反映されますか？",
+                "answer": "クラウド上の生産スケジューリングシステムと連携し、即時にライン計画を再構築します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "CR_Cs2 (設備稼働監視IoTの導入)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "設備稼働監視IoTを導入するとコスト削減にどう繋がるのですか？",
+                "answer": "リアルタイムで稼働状況を可視化し、不要な待機時間や故障リスクを減らせます。"
+              },
+              {
+                "questionType": "what",
+                "question": "具体的にはどんなデータを取得しますか？",
+                "answer": "モーターの振動や温度、ライン稼働時間、エネルギー使用量など多種のセンサーデータです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの設備から優先的に導入しますか？",
+                "answer": "稼働率が低く、故障が多発している既存ラインに先行導入します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこれらのデータをモニタリングして対策を立案しますか？",
+                "answer": "設備保全チームと生産管理チームが日次で状況をチェックし、対策を打ちます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでデータを管理・分析しますか？",
+                "answer": "工場内サーバとクラウド上の分析プラットフォームを併用します。"
+              }
+            ]
+          },
+          {
+            "childNode": "RI_Cs2 (リアルタイム生産スケジューリング)",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "リアルタイムで生産スケジュールを組むと売上増にどう繋がるのですか？",
+                "answer": "需要変動に即応してラインを切り替え、欠品や生産遅延を最小化できるからです。"
+              },
+              {
+                "questionType": "what",
+                "question": "どんな仕組みでスケジュールを自動化しますか？",
+                "answer": "AI需要予測と連動して、優先度の高い製品からライン割り当てを最適化します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのラインが自動化の恩恵を最も受けますか？",
+                "answer": "多品種少量生産が求められるラインで、段取り替えが多いところが最大の恩恵を受けます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がスケジューリングの最終承認を行いますか？",
+                "answer": "生産管理責任者がシステムが提案するスケジュールを確認し、運用に落とし込みます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでスケジューリングの変更通知を受け取りますか？",
+                "answer": "各ラインの管理端末と担当者のモバイル端末に自動通知されます。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

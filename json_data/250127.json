@@ -1,0 +1,1531 @@
+{
+  "DXProjects": [
+    {
+      "table": {
+        "企業名": "A社",
+        "課題・目的": "物流コスト（特に倉庫内作業の人件費）を削減したい",
+        "提案": "自動搬送ロボット導入と在庫管理ソフトの最適化で、手作業を削減する",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "現在は1日8時間×20日稼働で、月間160時間/人を5名分 = 800時間",
+          "導入後はロボット化で50%削減を目指す（1人当たり月80時間）",
+          "誤出荷削減（現状月40件→導入後15件）による返品対応コスト低減"
+        ],
+        "ROI算定": [
+          "コスト削減効果：月間合計400時間（5人×80時間）削減 → 1日8時間×20日の160時間に比べると約2.5人分に相当。時給3,000円換算で月120万円削減"
+        ]
+      },
+      "roiTrees_assignment_cost_only": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減]\n        CostReduction --> CR_A2[在庫コスト削減]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_A2",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減]\n            CR_A1 --> CR_A1_1[作業時間短縮]\n        CostReduction --> CR_A2[在庫コスト削減]\n            CR_A2 --> CR_A2_1[在庫ロス削減]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_A2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_A1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A2_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> CR_A1[人件費削減]\n            CR_A1 --> CR_A1_1[作業時間短縮]\n                CR_A1_1 --> CR_A1_1_1[自動化で人的ミス減]\n        CostReduction --> CR_A2[在庫コスト削減]\n            CR_A2 --> CR_A2_1[在庫ロス削減]\n                CR_A2_1 --> CR_A2_1_1[適正発注で余剰在庫抑制]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_A2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_A1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A2_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_A2_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_cost_only": {
+        "Depth3": [
+          {
+            "parentNode": "CostReduction",
+            "childNode": "CR_A1（人件費削減）, CR_A2（在庫コスト削減）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやってコスト削減を考えているのですか？",
+                "answer": "人件費と在庫関連費を中心に、作業効率や在庫ロスを減らす施策を検討しています。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が一番コスト高の要因になっていますか？",
+                "answer": "倉庫内の手作業による人件費と、余剰在庫による保管費が主な要因です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのコストから優先的に削減を進めますか？",
+                "answer": "まずは人件費削減がインパクトが大きいと考えています。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がコスト削減を主導しますか？",
+                "answer": "経営企画部と現場管理チームが連携して進めます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで一番改善余地がありますか？",
+                "answer": "在庫管理のミスや作業時間の長さが顕著な倉庫運営部分です。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "CR_A1（人件費削減）",
+            "childNode": "CR_A1_1（作業時間短縮）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって作業時間を短縮するのですか？",
+                "answer": "ピッキングや搬送を自動化し、手作業での移動や確認を減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が現在の作業時間を大きくしている主因ですか？",
+                "answer": "手動での在庫チェックやロケーション検索に時間がかかっています。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの工程が最も時間短縮のインパクトが大きいですか？",
+                "answer": "在庫ピッキングと棚への補充工程を自動化することが最大の効果を生みます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がシステム選定を行うのですか？",
+                "answer": "IT担当チームと倉庫管理チームが共同でベンダーを選定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どの倉庫エリアから導入を始めますか？",
+                "answer": "在庫回転率の高いエリアから優先的に始めます。"
+              }
+            ]
+          },
+          {
+            "parentNode": "CR_A2（在庫コスト削減）",
+            "childNode": "CR_A2_1（在庫ロス削減）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのように在庫ロスを削減するのですか？",
+                "answer": "適正な在庫水準をリアルタイムで把握し、不要な発注や保管を避けます。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が在庫ロスの主要因になっていますか？",
+                "answer": "過剰発注や誤出荷、商品破損などがロスを生む原因です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの品目のロスが特に大きいのですか？",
+                "answer": "需要予測の難しい季節商品やロングテール商品がロスを増やしています。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が在庫レベルの調整を担当しますか？",
+                "answer": "購買担当と倉庫管理チームが在庫量をコントロールします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで在庫が滞留しやすいですか？",
+                "answer": "需要の少ないエリアや季節外れの商品があるラック付近で滞留しやすいです。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "CR_A1_1（作業時間短縮）",
+            "childNode": "CR_A1_1_1（自動化で人的ミス減）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって人的ミスを減らせますか？",
+                "answer": "ロボットとバーコード管理で作業工程を可視化し、手作業チェックを最低限にします。"
+              },
+              {
+                "questionType": "what",
+                "question": "人的ミスが起こると何が問題になりますか？",
+                "answer": "誤出荷や返品対応が増え、余計な工数とコストがかかります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの作業ステップが最もミスが多いですか？",
+                "answer": "在庫ピッキング時の数量確認や品番の取り違いが多いです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がミスの発生を監視しますか？",
+                "answer": "倉庫のチームリーダーと品質管理担当が定期的にログをチェックします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで改善策の効果を一番期待しますか？",
+                "answer": "高額商品や返品率の高いカテゴリにおける誤出荷防止に特に期待しています。"
+              }
+            ]
+          },
+          {
+            "parentNode": "CR_A2_1（在庫ロス削減）",
+            "childNode": "CR_A2_1_1（適正発注で余剰在庫抑制）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって余剰在庫を抑制するのですか？",
+                "answer": "需要予測システムを導入し、必要なタイミングで最適量だけ発注する仕組みを作ります。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が余剰在庫を生む最大の要因ですか？",
+                "answer": "需要予測の精度不足と発注ロットの過大設定が主な要因です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの商品の在庫が過剰になるリスクが高いですか？",
+                "answer": "季節変動のある商品やキャンペーンに左右されやすい商品です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が発注の最終決定を行いますか？",
+                "answer": "購買部門のリーダーがシステムの提案を確認し、最終発注を承認します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで最も保管コストがかかっていますか？",
+                "answer": "メイン倉庫が容量いっぱいになり、一部の在庫を別倉庫に置くことでコストが嵩んでいます。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_cost_only": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> SCR_A1[自動搬送ロボット導入]\n        CostReduction --> SCR_A2[在庫管理システム最適化]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_A2",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> SCR_A1[自動搬送ロボット導入]\n            SCR_A1 --> SCR_A1_1[ピッキング工程の自動化]\n        CostReduction --> SCR_A2[在庫管理システム最適化]\n            SCR_A2 --> SCR_A2_1[リアルタイム在庫追跡]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_A2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_A1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A2_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> SCR_A1[自動搬送ロボット導入]\n            SCR_A1 --> SCR_A1_1[ピッキング工程の自動化]\n                SCR_A1_1 --> SCR_A1_1_1[AGV(無人搬送車)の導入]\n        CostReduction --> SCR_A2[在庫管理システム最適化]\n            SCR_A2 --> SCR_A2_1[リアルタイム在庫追跡]\n                SCR_A2_1 --> SCR_A2_1_1[自動警告アラート設定]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_A2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_A1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A2_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_A2_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_cost_only": {
+        "Depth3": [
+          {
+            "childNode": "SCR_A1（自動搬送ロボット導入）, SCR_A2（在庫管理システム最適化）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやってコストを下げるためにシステムを導入するのですか？",
+                "answer": "搬送をロボット化し、在庫を適切に管理することで人手作業を減らし、工数とミスを削減します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何を最初に導入するのが効果的ですか？",
+                "answer": "まずは搬送ロボットを導入し、すぐに作業負荷を軽減するのが効果的です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのロボットやシステムが自社に合っていますか？",
+                "answer": "倉庫規模やレイアウトに適したAGVと、リアルタイム管理が可能な在庫ソフトを選びます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が導入プロジェクトを推進しますか？",
+                "answer": "IT部門と物流部門が協力して要件定義と検証を進めます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで大きな導入効果が期待できますか？",
+                "answer": "ピッキングと入出庫が頻繁な主倉庫で導入効果が最大化します。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "SCR_A1_1（ピッキング工程の自動化）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのようにピッキング工程を自動化するのですか？",
+                "answer": "無人搬送車や自動棚を使い、作業者が商品を探し回らなくても済む仕組みにします。"
+              },
+              {
+                "questionType": "what",
+                "question": "ピッキング時間を減らすと何がメリットになりますか？",
+                "answer": "人件費を削減し、誤出荷も防ぎやすくなるため全体コストの低減につながります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの場所から自動化を始めると効率的ですか？",
+                "answer": "出荷頻度の高い商品棚から導入するのが最も効果的です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がロボットの運用管理を行いますか？",
+                "answer": "倉庫管理チームとIT部門が連携してロボット稼働状況をモニターします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこにロボットの充電ステーションを設置しますか？",
+                "answer": "メイン通路や作業動線を妨げない場所に充電ステーションを設置します。"
+              }
+            ]
+          },
+          {
+            "childNode": "SCR_A2_1（リアルタイム在庫追跡）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって在庫をリアルタイムで追跡するのですか？",
+                "answer": "バーコードやRFIDを使い、入出庫時に自動で在庫データを更新します。"
+              },
+              {
+                "questionType": "what",
+                "question": "リアルタイム更新のメリットは何ですか？",
+                "answer": "在庫ロスや誤発注を防ぎ、適正な補充タイミングを把握できます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのシステムが一番運用しやすそうですか？",
+                "answer": "クラウド型の在庫管理ソフトを使い、複数拠点からでも一元管理可能にします。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が在庫データのメンテナンスを担当しますか？",
+                "answer": "倉庫管理担当とIT部門が権限を分担し、入力ミスやデータ整合性をチェックします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこにセンサーや読取機を設置する必要がありますか？",
+                "answer": "入荷口、ピッキング棚、出荷口など物流の主要ポイントに設置します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "SCR_A1_1_1（AGV(無人搬送車)の導入）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "AGV導入でどれくらい作業時間が短縮できるのですか？",
+                "answer": "手動搬送の大部分を自動化でき、約30〜40%の作業時間削減を見込んでいます。"
+              },
+              {
+                "questionType": "what",
+                "question": "AGVが運搬するのは具体的にどのような荷物ですか？",
+                "answer": "ピッキング後の商品や補充用在庫をメインに運搬します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのAGVメーカーが候補ですか？",
+                "answer": "倉庫内レイアウトや負荷重量に合わせて複数社から比較検討します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がAGVのメンテナンスを行うのですか？",
+                "answer": "倉庫管理チームが日常点検を行い、専門業者が定期メンテナンスを実施します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこをAGVの走行ルートに設定しますか？",
+                "answer": "メイン通路とピッキング棚、出荷エリアを結ぶルートを優先します。"
+              }
+            ]
+          },
+          {
+            "childNode": "SCR_A2_1_1（自動警告アラート設定）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "在庫異常時のアラートはどのように発信されますか？",
+                "answer": "システムが閾値を検知すると、メールやチャットツールで担当者に通知します。"
+              },
+              {
+                "questionType": "what",
+                "question": "在庫異常にはどんなケースがありますか？",
+                "answer": "在庫残量の急激な減少や、一定期間動きがないデッドストックなどが該当します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの閾値をどのように設定しますか？",
+                "answer": "商品カテゴリごとに回転率やリードタイムを考慮して閾値を設けます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がアラート対応の責任を持ちますか？",
+                "answer": "購買担当と在庫管理担当が連携し、原因分析と対処を迅速に行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで最もアラート機能が必要とされていますか？",
+                "answer": "販売動向が不安定な商品や、季節商材の在庫エリアで需要が高いです。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "table": {
+        "企業名": "B社",
+        "課題・目的": "オンライン顧客対応を強化し、売上を増加させたい",
+        "提案": "チャットボット＋AIレコメンド導入により、問い合わせ対応のスピード向上と追加購買を促進",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "問い合わせ件数：1日300件→対応迅速化で新規応対枠を50件捻出",
+          "追加購買率：現状5%→導入後8%を目指す",
+          "チャットボット導入で担当者の一次対応が3分の1に削減（空いた時間で新規リードフォロー）"
+        ],
+        "ROI算定": [
+          "売上増加効果：追加購買率アップで月100万円〜200万円増加を目標",
+          "問い合わせ削減で月間合計150時間の担当者工数を新規開拓に回せる → 新規売上が約10〜15%増"
+        ]
+      },
+      "roiTrees_assignment_revenue_only": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[オンライン接点の拡充]\n        RevenueIncrease --> RI_B2[追加購買率の向上]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RI_B2",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[オンライン接点の拡充]\n            RI_B1 --> RI_B1_1[問い合わせ対応スピードUP]\n        RevenueIncrease --> RI_B2[追加購買率の向上]\n            RI_B2 --> RI_B2_1[関連商品レコメンド強化]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RI_B2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RI_B1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B2_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_B1[オンライン接点の拡充]\n            RI_B1 --> RI_B1_1[問い合わせ対応スピードUP]\n                RI_B1_1 --> RI_B1_1_1[チャットボット導入]\n        RevenueIncrease --> RI_B2[追加購買率の向上]\n            RI_B2 --> RI_B2_1[関連商品レコメンド強化]\n                RI_B2_1 --> RI_B2_1_1[顧客嗜好分析の高度化]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RI_B2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RI_B1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B2_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_B2_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_revenue_only": {
+        "Depth3": [
+          {
+            "parentNode": "RevenueIncrease",
+            "childNode": "RI_B1（オンライン接点の拡充）, RI_B2（追加購買率の向上）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのように売上を増加させる予定ですか？",
+                "answer": "オンラインでの顧客接点を増やし、購入機会を拡大する方針です。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が現状の売上停滞の原因なのでしょうか？",
+                "answer": "問い合わせ対応に時間がかかり、追加提案の余裕がないことが一因です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのチャネルを一番強化しますか？",
+                "answer": "まずはWebサイトのチャットサポートとSNS経由の問い合わせ体制を整備します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が施策を推進しますか？",
+                "answer": "デジタルマーケティング担当とカスタマーサポートチームが主体となります。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで顧客と接点を持つのが最も効果的ですか？",
+                "answer": "自社ECサイトとSNSが中心ですが、チャットアプリからの問い合わせも伸びています。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "RI_B1（オンライン接点の拡充）",
+            "childNode": "RI_B1_1（問い合わせ対応スピードUP）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって問い合わせ対応を早くするのですか？",
+                "answer": "チャットボットを導入し、一次対応を自動化して担当者の対応負荷を軽減します。"
+              },
+              {
+                "questionType": "what",
+                "question": "問い合わせが遅れると何が問題になりますか？",
+                "answer": "顧客満足度の低下につながり、購入に至らず離脱してしまう可能性が高まります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの時間帯の問い合わせが最も多いですか？",
+                "answer": "夜間や休日に集中する傾向があるため、24時間体制のチャット対応が有効です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がチャットボットの管理を行いますか？",
+                "answer": "カスタマーサポートチームとIT部門が共同で運用します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで応対スピードの数値を測定するのですか？",
+                "answer": "問い合わせ履歴を残すシステム上で応対開始〜完了までの時間を計測します。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RI_B2（追加購買率の向上）",
+            "childNode": "RI_B2_1（関連商品レコメンド強化）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのように関連商品をレコメンドするのですか？",
+                "answer": "AIが顧客の閲覧履歴や購入履歴を分析し、適切な商品を自動で提案します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が追加購買のきっかけになると考えていますか？",
+                "answer": "購入した商品との組み合わせや、お得なセット割などがきっかけになります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのカテゴリーの商品がレコメンドに向いていますか？",
+                "answer": "アクセサリやオプションパーツなど、メイン商品と相性が良いものが効果的です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がレコメンドアルゴリズムをメンテナンスしますか？",
+                "answer": "データサイエンスチームが定期的にモデルを調整し、精度を上げます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでレコメンドを表示するのが効果的ですか？",
+                "answer": "商品ページやカート画面、問い合わせチャット内での提案が効果的です。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "RI_B1_1（問い合わせ対応スピードUP）",
+            "childNode": "RI_B1_1_1（チャットボット導入）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "チャットボット導入でどのくらい対応時間が短縮されますか？",
+                "answer": "よくある質問の約80%を自動応答できるため、人手対応の工数を半分以下にできます。"
+              },
+              {
+                "questionType": "what",
+                "question": "チャットボットがどのような問い合わせに対応できますか？",
+                "answer": "注文状況の確認や商品仕様に関するFAQなど、定型的な質問に対応します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのチャットボットプラットフォームを検討していますか？",
+                "answer": "自社のシステム連携を考慮し、カスタマイズ性の高いクラウド型サービスを検討中です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がチャットボットのシナリオを作るのですか？",
+                "answer": "CS担当がよくある質問を整理し、IT部門がスクリプトを実装します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこにチャットボットの入り口を設置しますか？",
+                "answer": "ECサイトや公式SNSページなど、顧客がアクセスしやすい場所に設置します。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RI_B2_1（関連商品レコメンド強化）",
+            "childNode": "RI_B2_1_1（顧客嗜好分析の高度化）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "顧客嗜好をどのように高度に分析するのですか？",
+                "answer": "機械学習を用いてアクセス履歴や購入履歴を統合的に評価し、好みを推定します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が分析結果を左右する主要なデータですか？",
+                "answer": "閲覧時間やカート追加率、過去購入履歴、レビューの内容などです。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客層から優先的に分析を始めますか？",
+                "answer": "リピーターや高額商品購入者などLTVが高い顧客層から優先します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がレコメンドの最終ルールを決めるのですか？",
+                "answer": "データサイエンティストの提案をマーケティング責任者が最終承認します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで顧客の嗜好データを管理しますか？",
+                "answer": "社内DWH(データウェアハウス)に統合し、分析用のデータマートを構築しています。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_revenue_only": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> SRI_B1[チャットボット導入]\n        RevenueIncrease --> SRI_B2[AIレコメンド]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SRI_B2",
+              "importance_factor": 0.5
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> SRI_B1[チャットボット導入]\n            SRI_B1 --> SRI_B1_1[一次対応の自動化]\n        RevenueIncrease --> SRI_B2[AIレコメンド]\n            SRI_B2 --> SRI_B2_1[購入履歴分析]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SRI_B2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SRI_B1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B2_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> SRI_B1[チャットボット導入]\n            SRI_B1 --> SRI_B1_1[一次対応の自動化]\n                SRI_B1_1 --> SRI_B1_1_1[24時間無人サポート]\n        RevenueIncrease --> SRI_B2[AIレコメンド]\n            SRI_B2 --> SRI_B2_1[購入履歴分析]\n                SRI_B2_1 --> SRI_B2_1_1[パーソナライズド・オファー]",
+          "importance_factors": [
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B1",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SRI_B2",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SRI_B1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B2_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_B2_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_revenue_only": {
+        "Depth3": [
+          {
+            "childNode": "SRI_B1（チャットボット導入）, SRI_B2（AIレコメンド）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって売上を伸ばすための施策を実行するのですか？",
+                "answer": "チャットボットで対応を効率化し、AIレコメンドで追加購入を促す体制を整えます。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が一番大きな売上増のポイントになりますか？",
+                "answer": "顧客対応を迅速化して離脱を防ぎ、AIレコメンドで商品提案を強化する点です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの機能が優先度高いですか？",
+                "answer": "まずはチャットボットによる24時間の一次対応が優先度高いです。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がAIレコメンドのモデルを作りますか？",
+                "answer": "データ分析チームが中心となり、マーケティング担当と連携して作成します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでチャットボットを使うと効果的ですか？",
+                "answer": "ECサイトの問い合わせページやLINEなど、顧客がアクセスしやすい場所です。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "SRI_B1_1（一次対応の自動化）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "一次対応をどのように自動化しますか？",
+                "answer": "FAQをベースにチャットボットが即時回答し、複雑な案件だけ人が担当します。"
+              },
+              {
+                "questionType": "what",
+                "question": "自動化すると顧客満足度はどうなりますか？",
+                "answer": "問い合わせに迅速に答えられるため、多くの場合満足度が向上します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの質問項目を自動化する予定ですか？",
+                "answer": "商品仕様や注文状況確認など、テンプレ化しやすいものから自動化します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がチャットボットの回答精度を管理しますか？",
+                "answer": "CS担当とシステムチームがユーザーフィードバックを元に精度を高めます。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこにチャットボットが実装されるのですか？",
+                "answer": "公式サイトのサポートページとSNSメッセージ機能に実装予定です。"
+              }
+            ]
+          },
+          {
+            "childNode": "SRI_B2_1（購入履歴分析）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "購入履歴をどのように分析しますか？",
+                "answer": "顧客IDごとの購入パターンを機械学習でクラスタリングし、関連商品を抽出します。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が購入パターンを分類する上で重要ですか？",
+                "answer": "購買頻度や購入金額、商品カテゴリの組み合わせがキーとなります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのタイミングでおすすめを表示しますか？",
+                "answer": "カート投入時や購入完了前後など、購買意欲が高いタイミングを狙います。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が分析結果を活用して施策を打ちますか？",
+                "answer": "マーケティングチームと商品開発チームが分析結果を参考に販促企画を立案します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこに購入履歴データを集約するのですか？",
+                "answer": "クラウド上のデータウェアハウスに全注文データを集めて一元管理します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "SRI_B1_1_1（24時間無人サポート）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "24時間対応はどのように実現しますか？",
+                "answer": "チャットボットを常時稼働させ、夜間や休日も自動で回答できるようにします。"
+              },
+              {
+                "questionType": "what",
+                "question": "無人サポートで何が最も改善されますか？",
+                "answer": "顧客が疑問を抱えたまま離脱するリスクが減り、購買率向上が期待できます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの問い合わせが夜間に多いのですか？",
+                "answer": "商品の在庫確認や注文変更など、急ぎの問い合わせが夜間にも発生します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が無人サポート時のトラブルを監視しますか？",
+                "answer": "システム監視チームが稼働状態をモニターし、障害時にはアラートを受け取ります。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで顧客がやり取りの履歴を確認できますか？",
+                "answer": "マイページやサポート履歴画面でチャット内容をあとから確認可能です。"
+              }
+            ]
+          },
+          {
+            "childNode": "SRI_B2_1_1（パーソナライズド・オファー）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのように個別オファーを自動生成するのですか？",
+                "answer": "AIが購入履歴や行動データを基に最適なクーポンやセット割引を提案します。"
+              },
+              {
+                "questionType": "what",
+                "question": "パーソナライズされたオファーの利点は何ですか？",
+                "answer": "顧客との関連性が高い提案ができ、アップセル・クロスセルの機会が増えます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客がパーソナライズド・オファーの対象ですか？",
+                "answer": "過去の購入データや閲覧履歴を持つリピーターが優先的に対象となります。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこれらのオファーを検証・調整しますか？",
+                "answer": "マーケティングチームがクリック率や購入率を確認し、内容を随時ブラッシュアップします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで個別オファーを受け取れるのですか？",
+                "answer": "ログイン後のトップページやメール、LINE通知などで表示されます。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "table": {
+        "企業名": "C社",
+        "課題・目的": "サプライチェーン全体の効率化と新規顧客開拓による売上増を同時に実現したい",
+        "提案": "在庫最適化システム＋自動発注、付帯サービス（サブスクリプション型）提案強化",
+        "目的を達成するための重要な定量要素（目的の分解）": [
+          "在庫回転率：現状月1.2回→導入後2.0回を目指す",
+          "サブスク契約数：現状300社→導入後500社を目標",
+          "在庫ロス：現状月50万円相当→導入後20万円に削減"
+        ],
+        "ROI算定": [
+          "コスト削減効果：在庫回転率向上で余剰在庫の保管費・廃棄費を月30万円削減",
+          "売上増加効果：サブスク契約増で月+100〜200万円の定期収入を目指す"
+        ]
+      },
+      "roiTrees_assignment_cost_and_revenue": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n    Gain --> RevenueIncrease[売上増加]\n        CostReduction --> CR_C1[在庫コスト削減]\n        RevenueIncrease --> RI_C1[サブスク契約数拡大]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> CR_C1[在庫コスト削減]\n            CR_C1 --> CR_C1_1[在庫回転率向上]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_C1[サブスク契約数拡大]\n            RI_C1 --> RI_C1_1[新規顧客獲得]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> CR_C1[在庫コスト削減]\n            CR_C1 --> CR_C1_1[在庫回転率向上]\n                CR_C1_1 --> CR_C1_1_1[余剰在庫圧縮]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> RI_C1[サブスク契約数拡大]\n            RI_C1 --> RI_C1_1[新規顧客獲得]\n                RI_C1_1 --> RI_C1_1_1[継続率向上施策]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "CR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "CR_C1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "RI_C1_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_assignment_cost_and_revenue": {
+        "Depth3": [
+          {
+            "parentNode": "CostReduction",
+            "childNode": "CR_C1（在庫コスト削減）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって在庫コストを削減しますか？",
+                "answer": "在庫回転率を上げることで、保管費や廃棄ロスを減らします。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が在庫コストを増やしている一番の要因でしょうか？",
+                "answer": "需要予測の精度が低く、余剰在庫が発生していることが大きな要因です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのカテゴリーの商品から在庫削減を進めますか？",
+                "answer": "需要の変動が読みづらい高価格帯の商品の在庫をまず見直します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が在庫戦略を最終決定しますか？",
+                "answer": "サプライチェーン管理チームのリーダーが最終判断を行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで在庫を集中管理しますか？",
+                "answer": "メイン倉庫に在庫を集約し、リアルタイムで各拠点の在庫を監視します。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RevenueIncrease",
+            "childNode": "RI_C1（サブスク契約数拡大）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのようにサブスク契約を増やすのですか？",
+                "answer": "新規顧客への提案強化と既存顧客のアップグレード施策を行います。"
+              },
+              {
+                "questionType": "what",
+                "question": "サブスク契約が増えるとどんなメリットがありますか？",
+                "answer": "安定した定期収入を確保し、長期的な顧客との関係構築が期待できます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの顧客層に特にサブスクを提案しますか？",
+                "answer": "定期的に追加発注がある法人顧客を中心に提案します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がサブスクの営業戦略を立案しますか？",
+                "answer": "営業部とマーケティング部が協同で戦略を策定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでサブスク契約の案内を行いますか？",
+                "answer": "オンライン商談やウェビナー、既存顧客にはメール配信で案内します。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "parentNode": "CR_C1（在庫コスト削減）",
+            "childNode": "CR_C1_1（在庫回転率向上）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "在庫回転率を上げるためにはどうしますか？",
+                "answer": "需要予測精度を高め、必要なときに必要な量だけを仕入れる仕組みを作ります。"
+              },
+              {
+                "questionType": "what",
+                "question": "在庫回転率が低いと何が問題になりますか？",
+                "answer": "古い在庫の保管コストが増加し、商品価値の目減りや廃棄リスクが高まります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの分析ツールを使って需要を予測しますか？",
+                "answer": "AIを活用した在庫管理システムと販売データの統合分析ツールを使用します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が具体的な回転率目標を設定しますか？",
+                "answer": "サプライチェーン管理チームが市場動向を踏まえ、KPIを設定します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで特に回転率の改善が必要ですか？",
+                "answer": "需要が読みにくい新製品や季節商材が集まる倉庫エリアです。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RI_C1（サブスク契約数拡大）",
+            "childNode": "RI_C1_1（新規顧客獲得）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "新規顧客をどうやって獲得しますか？",
+                "answer": "ターゲット企業リストへのアプローチと展示会・オンラインセミナーでの集客を強化します。"
+              },
+              {
+                "questionType": "what",
+                "question": "新規顧客が契約しやすい仕組みは何ですか？",
+                "answer": "無料トライアルや柔軟なプラン設計を用意して、導入ハードルを下げています。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの業種の企業を重点的に狙いますか？",
+                "answer": "定期的な補充ニーズがある小売業や製造業、外食産業を重点ターゲットにします。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が新規顧客への営業を担当しますか？",
+                "answer": "法人営業チームがメインでアプローチし、技術サポートと連携して提案を実施します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでリードを獲得しますか？",
+                "answer": "オンライン展示会、業界SNSコミュニティ、広告経由の問い合わせなどでリードを獲得します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "parentNode": "CR_C1_1（在庫回転率向上）",
+            "childNode": "CR_C1_1_1（余剰在庫圧縮）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "余剰在庫をどうやって圧縮するのですか？",
+                "answer": "AI需要予測に基づく自動発注と定期的な在庫見直しにより、不必要な発注を防ぎます。"
+              },
+              {
+                "questionType": "what",
+                "question": "余剰在庫を放置すると何が問題ですか？",
+                "answer": "保管コストの増加や商品劣化・廃棄による損失が発生します。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのような在庫が特に圧縮の対象になりますか？",
+                "answer": "回転率が低いロングテール商品や季節を過ぎた在庫が対象です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が余剰在庫の分析を行いますか？",
+                "answer": "在庫管理部門とデータ分析チームが在庫レポートを定期的にチェックします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで廃棄や値下げ販売を行いますか？",
+                "answer": "期限が近い商品はアウトレット店舗やECのセールコーナーで処分します。"
+              }
+            ]
+          },
+          {
+            "parentNode": "RI_C1_1（新規顧客獲得）",
+            "childNode": "RI_C1_1_1（継続率向上施策）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのようにして継続率を上げますか？",
+                "answer": "定期モニタリングと顧客サポートの強化、利用データを基にした追加提案を行います。"
+              },
+              {
+                "questionType": "what",
+                "question": "継続率が上がらないと何が問題ですか？",
+                "answer": "解約が増えると売上が不安定になり、長期的な収益予測が難しくなります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのサービスが特に継続率を高める可能性がありますか？",
+                "answer": "顧客ごとの利用状況に応じたパーソナライズド・サポートが有効です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が継続率の指標をモニタリングしますか？",
+                "answer": "カスタマーサクセスチームが契約状況と利用頻度を定期的にチェックします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで顧客満足度や解約理由を把握しますか？",
+                "answer": "解約時や定期アンケートで理由をヒアリングし、CRMに記録します。"
+              }
+            ]
+          }
+        ]
+      },
+      "roiTrees_suggest_cost_and_revenue": {
+        "depth3": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n    Gain --> RevenueIncrease[売上増加]\n        CostReduction --> SCR_C1[在庫最適化システム導入]\n        RevenueIncrease --> SRI_C1[サブスクモデル拡充]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth4": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> SCR_C1[在庫最適化システム導入]\n            SCR_C1 --> SCR_C1_1[自動発注と在庫監視]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> SRI_C1[サブスクモデル拡充]\n            SRI_C1 --> SRI_C1_1[新規顧客向けプラン]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1_1",
+              "importance_factor": 1
+            }
+          ]
+        },
+        "depth5": {
+          "graph": "graph TD\n    Gain[Gain]\n    Gain --> CostReduction[コスト削減]\n        CostReduction --> SCR_C1[在庫最適化システム導入]\n            SCR_C1 --> SCR_C1_1[自動発注と在庫監視]\n                SCR_C1_1 --> SCR_C1_1_1[需要予測AIの活用]\n    Gain --> RevenueIncrease[売上増加]\n        RevenueIncrease --> SRI_C1[サブスクモデル拡充]\n            SRI_C1 --> SRI_C1_1[新規顧客向けプラン]\n                SRI_C1_1 --> SRI_C1_1_1[継続課金インセンティブ]",
+          "importance_factors": [
+            {
+              "node": "CostReduction",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "RevenueIncrease",
+              "importance_factor": 0.5
+            },
+            {
+              "node": "SCR_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SCR_C1_1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1_1",
+              "importance_factor": 1
+            },
+            {
+              "node": "SRI_C1_1_1",
+              "importance_factor": 1
+            }
+          ]
+        }
+      },
+      "QAndA_suggest_cost_and_revenue": {
+        "Depth3": [
+          {
+            "childNode": "SCR_C1（在庫最適化システム導入）, SRI_C1（サブスクモデル拡充）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのようにコスト削減と売上拡大を両立させるのですか？",
+                "answer": "在庫最適化システムで無駄を省きつつ、サブスクモデルで継続的な売上基盤を作ります。"
+              },
+              {
+                "questionType": "what",
+                "question": "今回のDX施策で何が最も大きな変化になりますか？",
+                "answer": "在庫が自動で最適化されるため、保管費やロスが減り、新規顧客向けのサービス強化が可能になります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのシステムやプランが最優先で導入されますか？",
+                "answer": "まずは在庫管理の自動化を進め、並行してサブスクの新規プランを立ち上げます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が全体プロジェクトを統括しますか？",
+                "answer": "サプライチェーン管理責任者と営業部長が共同で統括します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでシステムのテスト導入を行いますか？",
+                "answer": "一部の拠点と顧客群をパイロットとして選び、効果検証を行います。"
+              }
+            ]
+          }
+        ],
+        "Depth4": [
+          {
+            "childNode": "SCR_C1_1（自動発注と在庫監視）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どうやって在庫を自動発注するのですか？",
+                "answer": "需要予測の結果に合わせ、システムが自動的に補充量を算出して発注を行います。"
+              },
+              {
+                "questionType": "what",
+                "question": "在庫監視をリアルタイムで行うメリットは何ですか？",
+                "answer": "不足や過剰が即座にわかり、機会損失や無駄な保管費を防げます。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのくらいの頻度で在庫データが更新されますか？",
+                "answer": "出荷・入荷のタイミングで即時更新され、管理画面で常に最新情報を確認できます。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰が設定した発注ルールをメンテナンスしますか？",
+                "answer": "購買担当とシステム管理者が需要変動に合わせて発注基準を見直します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこにシステムの操作端末を設置しますか？",
+                "answer": "購買チームと倉庫管理チームのオフィスや倉庫内に端末を配置します。"
+              }
+            ]
+          },
+          {
+            "childNode": "SRI_C1_1（新規顧客向けプラン）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "新規顧客が契約しやすいプランはどのようなものですか？",
+                "answer": "導入時に割引や無料期間を設け、顧客がリスクなく試せる内容にします。"
+              },
+              {
+                "questionType": "what",
+                "question": "何が顧客にとってサブスク契約のメリットになるのですか？",
+                "answer": "安定供給やアフターサポートがセットになり、長期的にコストを抑えられる点です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どの業界や規模の顧客を主にターゲットにしますか？",
+                "answer": "社内の在庫を持つ中小企業や、複数拠点で購買管理が複雑な企業を中心に狙います。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がこの新規プランの営業を担当しますか？",
+                "answer": "新規営業チームが専門的なサポート要員と組み合わせてアプローチします。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでプランの内容をアピールしますか？",
+                "answer": "自社ウェブサイトの特設ページやオンラインセミナー、展示会で紹介します。"
+              }
+            ]
+          }
+        ],
+        "Depth5": [
+          {
+            "childNode": "SCR_C1_1_1（需要予測AIの活用）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "需要予測AIはどのように導入しますか？",
+                "answer": "過去の販売データと外部要因（季節・トレンド）を統合し、機械学習モデルを構築します。"
+              },
+              {
+                "questionType": "what",
+                "question": "AIの予測精度向上には何が重要ですか？",
+                "answer": "定期的なモデル更新と、実際の販売実績との誤差分析が重要です。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのようなアルゴリズムを想定していますか？",
+                "answer": "時系列解析や深層学習モデルを試験的に導入し、最適なものを選定します。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がAIモデルを運用・メンテナンスしますか？",
+                "answer": "データサイエンスチームが運用し、サプライチェーン担当と定例で調整を行います。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこで予測データを可視化しますか？",
+                "answer": "管理ダッシュボード上で、在庫担当者や経営陣がリアルタイムに確認できます。"
+              }
+            ]
+          },
+          {
+            "childNode": "SRI_C1_1_1（継続課金インセンティブ）",
+            "questions": [
+              {
+                "questionType": "how",
+                "question": "どのようにして継続課金を促すのですか？",
+                "answer": "長期契約特典や追加サービスをインセンティブとして提供します。"
+              },
+              {
+                "questionType": "what",
+                "question": "顧客が継続課金を選ばない場合の主な理由は何ですか？",
+                "answer": "コスト対効果の不透明さやサポート不足が原因で解約に至るケースがあります。"
+              },
+              {
+                "questionType": "which",
+                "question": "どのような特典が最も魅力的ですか？",
+                "answer": "定期メンテナンスや優先サポート、利用料の段階的割引などが好評です。"
+              },
+              {
+                "questionType": "who",
+                "question": "誰がインセンティブの内容を検討しますか？",
+                "answer": "マーケティングとカスタマーサクセスのチームが連携して検討します。"
+              },
+              {
+                "questionType": "where",
+                "question": "どこでインセンティブ情報を告知しますか？",
+                "answer": "契約更新時の案内メールや顧客ポータルサイト上でアナウンスします。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
