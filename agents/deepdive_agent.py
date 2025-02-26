@@ -23,27 +23,28 @@ from utils.visualization import (
 )
 
 # 反省管理とタスク反省機能を初期化
+# 自動リセット機能はStreamlitのセッションからmain.pyで設定される
 reflection_manager = ReflectionManager()
 
-# Initialize LLM
+# LLMの初期化
 model = ChatOpenAI(
     model="gpt-4",
-    temperature=0.2,  # Lower temperature for more consistent, focused responses
-    streaming=True    # Enable streaming for real-time output
+    temperature=0.2,  # 一貫性の高い応答のための低い温度
+    streaming=True    # リアルタイム出力のためのストリーミング
 )
 exploration_model = model
-reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # Even lower temp for reflection
+reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # 反省にはさらに低い温度
 
 # タスク反省機能を初期化
 task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
 
 
 # =========================
-# Helper Functions
+# ヘルパー関数
 # =========================
 
 def find_node_by_path(root_node: ROINode, node_path: NodePath) -> Optional[ROINode]:
-    """Find a node using the path from root"""
+    """パスからノードを見つける"""
     if not node_path:
         return root_node
         
@@ -59,21 +60,21 @@ def find_node_by_path(root_node: ROINode, node_path: NodePath) -> Optional[ROINo
 
 
 def get_tree_context(state: DeepdiveState) -> str:
-    """Get formatted context of the current ROI tree for prompts"""
+    """プロンプト用の現在のROIツリーコンテキストを取得"""
     if not state["root_node"]:
-        return "No ROI tree has been created yet."
+        return "まだROIツリーが作成されていません。"
         
-    # Format the full tree for display
+    # ツリーを表示用にフォーマット
     tree_text = format_tree_for_display(state["root_node"])
     
-    # Get information about the current node and path
+    # 現在のノードとパスの情報を取得
     nodes_dict = build_nodes_dictionary(state["root_node"])
     path_text = get_node_path_string(state["node_path"], nodes_dict)
     
-    return f"""ROI Tree Structure:
+    return f"""ROIツリー構造:
 {tree_text}
 
-Current Path: {path_text}
+現在のパス: {path_text}
 """
 
 
@@ -82,23 +83,23 @@ def update_roi_tree(
     updates: List[ROINodeUpdate]
 ) -> Tuple[DeepdiveState, List[str]]:
     """
-    Update the ROI tree based on parsed updates
+    解析された更新情報に基づいてROIツリーを更新
     
     Args:
-        state: Current state
-        updates: List of node updates
+        state: 現在の状態
+        updates: ノード更新のリスト
         
     Returns:
-        Updated state and list of update descriptions
+        更新された状態と更新説明のリスト
     """
     if not state["root_node"]:
-        # Initialize with default tree if none exists
+        # ツリーが存在しない場合、デフォルトツリーで初期化
         state["root_node"] = create_default_roi_tree()
         if not state["current_node_id"]:
             state["current_node_id"] = state["root_node"].node_id
             state["node_path"] = [state["root_node"].node_id]
     
-    # Find the current node
+    # 現在のノードを検索
     current_node = None
     if state["current_node_id"]:
         current_node = find_node_by_path(state["root_node"], state["node_path"])
@@ -108,19 +109,19 @@ def update_roi_tree(
         state["current_node_id"] = current_node.node_id
         state["node_path"] = [current_node.node_id]
     
-    # Apply updates
+    # 更新を適用
     update_descriptions = []
     
     for update in updates:
         parent_node = current_node
         
-        # If a parent node ID is specified, try to find it
+        # 親ノードIDが指定されている場合、検索
         if update.parent_node_id:
             parent_search = state["root_node"].find_node_by_id(update.parent_node_id)
             if parent_search:
                 parent_node = parent_search
         
-        # Create and add the new node
+        # 新しいノードを作成して追加
         new_node = ROINode(
             name=update.name,
             details=update.details,
@@ -130,29 +131,29 @@ def update_roi_tree(
         
         parent_node.add_child(new_node)
         
-        # Update descriptions for user feedback
+        # ユーザーフィードバック用の更新説明
         update_descriptions.append(
-            f"Added node '{new_node.name}' under '{parent_node.name}' "
-            f"with importance factor {new_node.importance_factor:.1%}"
+            f"ノード '{new_node.name}' を '{parent_node.name}' の下に追加しました "
+            f"（重要度係数: {new_node.importance_factor:.1%}）"
         )
         
-        # Update the current focus to this new node
+        # 現在のフォーカスを新しいノードに更新
         state["current_node_id"] = new_node.node_id
         
-        # Update the node path
+        # ノードパスを更新
         if parent_node.node_id in state["node_path"]:
-            # Find the position of the parent in the path
+            # パス内の親の位置を検索
             idx = state["node_path"].index(parent_node.node_id)
-            # Truncate the path to the parent and add the new node
+            # パスを親まで切り詰めて新しいノードを追加
             state["node_path"] = state["node_path"][:idx+1] + [new_node.node_id]
         else:
-            # Add the new node to the path
+            # 新しいノードをパスに追加
             state["node_path"].append(new_node.node_id)
     
-    # Normalize importance factors
+    # 重要度係数を正規化
     state["root_node"].normalize_importance_factors()
     
-    # Add current node to exploration history if not already there
+    # 現在のノードをまだ探索履歴にない場合は追加
     if state["current_node_id"] not in state["exploration_history"]:
         state["exploration_history"].append(state["current_node_id"])
     
@@ -160,7 +161,7 @@ def update_roi_tree(
 
 
 # =========================
-# Graph nodes (agent steps)
+# グラフノード（エージェントステップ）
 # =========================
 
 def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
@@ -357,23 +358,23 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
 
 
 def should_continue_deepdive(state: DeepdiveState) -> Literal["continue", "__end__"]:
-    """Decide whether to continue exploration or end"""
+    """探索を続けるかどうかを決定"""
     return "continue" if not state["exploration_complete"] else "__end__"
 
 
 # =========================
-# Graph construction
+# グラフ構築
 # =========================
 
-def build_deepdive_graph() -> Any:  # Using Any for the return type to avoid circular imports
-    """Build and compile the deepdive agent graph"""
+def build_deepdive_graph() -> Any:  # 循環インポートを避けるためAny型を使用
+    """深掘りエージェントグラフを構築してコンパイル"""
     graph = StateGraph(DeepdiveState)
     
-    # Add nodes
+    # ノード追加
     graph.add_node("deepdive_conversation", deepdive_conversation)
     graph.add_node("self_reflect_deepdive", self_reflect_deepdive)
     
-    # Add edges
+    # エッジ追加
     graph.add_edge("deepdive_conversation", "self_reflect_deepdive")
     graph.add_conditional_edges(
         "self_reflect_deepdive",
@@ -390,7 +391,7 @@ def build_deepdive_graph() -> Any:  # Using Any for the return type to avoid cir
 
 
 def init_deepdive_state() -> DeepdiveState:
-    """Initialize the deepdive state"""
+    """深掘り状態を初期化"""
     return DeepdiveState(
         messages=[],
         root_node=create_default_roi_tree(),

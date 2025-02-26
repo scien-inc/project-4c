@@ -43,15 +43,28 @@ class Reflection(BaseModel):
 class ReflectionManager:
     """リフレクションの保存・取得を管理するクラス"""
     
-    def __init__(self, file_path: str = "roi_agents/data/reflections.json"):
+    def __init__(self, file_path: str = "roi_agents/data/reflections.json", auto_reset: bool = False):
         """
         ReflectionManagerの初期化
         
         Args:
             file_path: リフレクションを保存するJSONファイルのパス
+            auto_reset: 初期化時に既存のリフレクションデータをリセットするかどうか
         """
         self.file_path = file_path
-        self.reflections = self._load_reflections()
+        self.reflections = {}
+        
+        if auto_reset:
+            self.reset_reflections()
+        else:
+            self.reflections = self._load_reflections()
+    
+    def reset_reflections(self) -> Dict:
+        """リフレクションデータをリセットし、空の状態に戻す"""
+        self.reflections = {}
+        self._save_reflections()
+        print(f"リフレクションデータをリセットしました。ファイルパス: {self.file_path}")
+        return self.reflections
         
     def _load_reflections(self) -> Dict[str, Reflection]:
         """

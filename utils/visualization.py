@@ -4,40 +4,6 @@ Utilities for visualizing ROI trees and calculations
 from typing import Any, Dict, List, Optional
 import textwrap
 
-def generate_mermaid_html(node: Any) -> str:
-    """
-    ROIツリーのMermaidダイアグラムをHTMLとして生成
-    
-    Args:
-        node: ROIツリーのルート
-        
-    Returns:
-        Mermaid.jsを使用したHTML文字列
-    """
-    mermaid_code = node.get_full_mermaid()
-    
-    # エスケープされたコード用のプレースホルダー
-    mermaid_placeholder = "MERMAID_CODE_PLACEHOLDER"
-    
-    html = f"""
-    <div class="mermaid-container">
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-        <script>
-            mermaid.initialize({{
-                startOnLoad: true,
-                theme: 'default',
-                flowchart: {{ htmlLabels: true }},
-                securityLevel: 'loose'
-            }});
-        </script>
-        <div class="mermaid">
-            {mermaid_placeholder}
-        </div>
-    </div>
-    """
-    
-    # プレースホルダーを実際のコードに置き換え（エスケープの問題を回避）
-    return html.replace(mermaid_placeholder, mermaid_code)
 
 def format_tree_for_display(node: Any, indent: int = 0, show_details: bool = True) -> str:
     """
@@ -116,33 +82,69 @@ def generate_mermaid_diagram(node: Any) -> str:
     return node.get_full_mermaid()
 
 
-def format_roi_calculation(roi_calc: Dict[str, Any], indent: int = 0) -> str:
+def generate_mermaid_html(node: Any) -> str:
     """
-    ROI計算結果を表示用にフォーマット
+    ROIツリーのMermaidダイアグラムをHTMLとして生成
     
     Args:
-        roi_calc: ROI計算辞書
-        indent: インデントレベル
+        node: ROIツリーのルート
         
     Returns:
-        フォーマットされた文字列
+        Mermaid.jsを使用したHTML文字列
+    """
+    mermaid_code = node.get_full_mermaid()
+    
+    # エスケープされたコード用のプレースホルダー
+    mermaid_placeholder = "MERMAID_CODE_PLACEHOLDER"
+    
+    html = f"""
+    <div class="mermaid-container">
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>
+            mermaid.initialize({{
+                startOnLoad: true,
+                theme: 'default',
+                flowchart: {{ htmlLabels: true }},
+                securityLevel: 'loose'
+            }});
+        </script>
+        <div class="mermaid">
+            {mermaid_placeholder}
+        </div>
+    </div>
+    """
+    
+    # プレースホルダーを実際のコードに置き換え（エスケープの問題を回避）
+    return html.replace(mermaid_placeholder, mermaid_code)
+
+
+def format_roi_calculation(roi_calc: Dict[str, Any], indent: int = 0) -> str:
+    """
+    Format ROI calculation results for display
+    
+    Args:
+        roi_calc: ROI calculation dictionary
+        indent: Indentation level
+        
+    Returns:
+        Formatted string
     """
     prefix = "  " * indent
     lines = [f"{prefix}• **{roi_calc['name']}**"]
     
-    # 重み付けされた値を追加
+    # Add weighted value
     lines.append(f"{prefix}  合計価値: ¥{roi_calc['weighted_value']*1000:,.0f}")
     
-    # 子要素を処理
+    # Process children
     if 'children_values' in roi_calc:
         for child in roi_calc['children_values']:
-            # 重要度係数付きで子情報を追加
+            # Add child info with importance factor
             child_value = child.get('weighted_value', 0)
             importance = child.get('importance_factor', 1.0)
             
             lines.append(f"{prefix}  • {child['name']}: ¥{child_value*1000:,.0f} (重み: {importance:.1%})")
             
-            # 孫要素を再帰的に処理
+            # Recursively process grandchildren
             if 'children' in child and child['children']:
                 child_calc = {
                     'name': child['name'],
@@ -207,5 +209,3 @@ def get_tree_statistics(root_node: Any) -> Dict[str, Any]:
     
     _traverse(root_node)
     return stats
-
-

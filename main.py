@@ -6,25 +6,31 @@ import streamlit as st
 from typing import Dict, List, Any, Optional
 import json
 import pandas as pd
+import streamlit.components.v1 as components
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_community.callbacks import get_openai_callback
 
+# LangSmithのトレースを設定（必要に応じて）
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-# プロジェクト名を設定（オプション）
 os.environ["LANGCHAIN_PROJECT"] = "roi_tree_explorer"
 
-from agents.deepdive_agent import build_deepdive_graph, init_deepdive_state
-from agents.proposal_agent import build_proposal_graph, init_proposal_state
+from agents.deepdive_agent import build_deepdive_graph, init_deepdive_state, self_reflect_deepdive, reflection_manager
+from agents.proposal_agent import build_proposal_graph, init_proposal_state, self_reflect_proposal
 from domain.roitree import ROINode, create_default_roi_tree
-from domain.reflection import ReflectionManager
+from domain.reflection import ReflectionManager, format_reflections
 from domain.schemas import DeepdiveState, ProposalState
-from utils.visualization import format_tree_for_display, generate_mermaid_diagram, format_roi_calculation
+from utils.visualization import (
+    format_tree_for_display, 
+    generate_mermaid_diagram, 
+    format_roi_calculation, 
+    generate_mermaid_html
+)
 from dotenv import load_dotenv
 
-# Load environment variables
+# 環境変数を読み込み
 load_dotenv()
 
 # 定数
@@ -33,7 +39,7 @@ PROPOSAL_STATE_KEY = "proposal_state"
 PAGE_TITLE = "ROIツリーエクスプローラー"
 PAGE_ICON = "💼"
 
-# Set page config
+# ページ設定
 st.set_page_config(
     page_title=PAGE_TITLE,
     page_icon=PAGE_ICON,
@@ -41,7 +47,7 @@ st.set_page_config(
 )
 
 # =========================
-# Streaming Handler for LangChain
+# LangChain用ストリーミングハンドラ
 # =========================
 
 class StreamHandler(BaseCallbackHandler):
@@ -63,7 +69,7 @@ class StreamHandler(BaseCallbackHandler):
 
 
 # =========================
-# Helper Functions
+# ヘルパー関数
 # =========================
 
 def run_one_step(app, current_state, stream_handler=None):
@@ -115,38 +121,38 @@ def display_messages(messages: List[Any], container):
 
 def display_roi_tree(root_node: ROINode, container):
     """
-    Display ROI tree in a Streamlit container
+    ROIツリーをStreamlitコンテナに表示
     
     Args:
-        root_node: Root of the ROI tree
-        container: Streamlit container
+        root_node: ROIツリーのルート
+        container: Streamlitコンテナ
     """
-    # Generate Mermaid diagram
-    mermaid_diagram = generate_mermaid_diagram(root_node)
+    # Mermaidダイアグラムを生成
+    container.subheader("ROIツリー可視化")
     
-    # Display it using st.graphviz_chart
-    container.subheader("ROI Tree Visualization")
-    container.markdown(f"```mermaid\n{mermaid_diagram}\n```")
+    # HTMLコードを生成してコンポーネントで表示
+    html = generate_mermaid_html(root_node)
+    components.html(html, height=400, scrolling=False)
     
-    # Also show as text
-    container.subheader("ROI Tree Structure")
+    # テキスト表示も提供
+    container.subheader("ROIツリー構造")
     tree_text = format_tree_for_display(root_node)
     container.markdown(tree_text)
 
 
 def display_roi_calculations(roi_calculations: Dict[str, Any], container):
     """
-    Display ROI calculations in a Streamlit container
+    ROI計算をStreamlitコンテナに表示
     
     Args:
-        roi_calculations: ROI calculation results
-        container: Streamlit container
+        roi_calculations: ROI計算結果
+        container: Streamlitコンテナ
     """
     if not roi_calculations:
-        container.info("No ROI calculations have been performed yet.")
+        container.info("まだROI計算は実行されていません。")
         return
         
-    container.subheader("ROI Calculations")
+    container.subheader("ROI計算")
     
     if "summary" in roi_calculations:
         summary = roi_calculations["summary"]
@@ -174,16 +180,31 @@ def display_roi_calculations(roi_calculations: Dict[str, Any], container):
 
 
 # =========================
-# Main Streamlit App
+# メインStreamlitアプリ
 # =========================
 
 def main():
     """メインStreamlitアプリケーション"""
     st.title(f"{PAGE_ICON} {PAGE_TITLE}")
     
+    # 自動リセット設定
+    auto_reset = st.session_state.get("auto_reset_enabled", False)
+    
     # サイドバーを追加
     with st.sidebar:
         st.title("設定")
+        
+        # 自動リセット設定
+        st.markdown("### データリセット設定")
+        auto_reset = st.checkbox("起動時に自動リセット", value=auto_reset, 
+                               help="アプリ起動時に反省データベースを自動的にリセットする")
+        st.session_state.auto_reset_enabled = auto_reset
+        
+        # リフレクションデータを明示的にリセットするボタン
+        if st.button("反省データベースをリセット"):
+            reflection_manager.reset_reflections()
+            st.success("反省データベースをリセットしました！")
+        
         st.markdown("### 課題深掘り設定")
         
         # 課題深掘り設定
@@ -194,7 +215,7 @@ def main():
         max_iterations_proposal = st.slider("最大反復回数（提案）", 3, 20, 10)
         
         # リセットボタン
-        st.markdown("### リセット")
+        st.markdown("### セッションリセット")
         if st.button("課題深掘りをリセット"):
             if DEEPDIVE_STATE_KEY in st.session_state:
                 del st.session_state[DEEPDIVE_STATE_KEY]
@@ -224,7 +245,7 @@ def main():
         このタブでは、エージェントが過去のタスク実行から学んだ反省データを確認できます。
         これらの反省は、将来のタスク実行の質を向上させるために使用されます。
         """)
-        reflection_manager = ReflectionManager()
+        
         # すべての反省を取得
         all_reflections = reflection_manager.get_all_reflections()
         
@@ -326,8 +347,9 @@ def main():
                     else:
                         st.info(f"タグ '{selected_tag}' を持つ反省データはありません。")
     
-    
-    # 既存のタブコードを続ける...
+    # =========================
+    # 課題深掘りエージェントタブ
+    # =========================
     with tab_deepdive:
         st.header("課題深掘りエージェント - ROIツリー探索")
         st.markdown("""
@@ -391,7 +413,7 @@ def main():
                 # 会話をすぐに表示（レスポンス生成前）
                 chat_container.chat_message("user").markdown(user_input)
                 
-                # グラフを作成
+                # セルフリフレクション実行（ステータス判定のみ）
                 deepdive_graph = build_deepdive_graph()
                 
                 with get_openai_callback() as cb:
@@ -399,10 +421,18 @@ def main():
                     stream_handler = StreamHandler(stream_container)
                     
                     try:
-                        # エージェントの応答を追加
+                        # 最初に入力されたメッセージに基づく応答を生成
                         new_state = run_one_step(deepdive_graph, state, stream_handler)
                         
-                        # 最新の状態をセッションに保存
+                        # 直後にセルフリフレクションを実行（裏側で実行）
+                        reflection_state = new_state.copy()
+                        reflection_state = self_reflect_deepdive(reflection_state)
+                        
+                        # 会話終了判定だけをオリジナル状態に反映
+                        new_state["self_reflection"] = reflection_state["self_reflection"]
+                        new_state["exploration_complete"] = reflection_state["exploration_complete"]
+                        
+                        # 状態を更新
                         st.session_state[DEEPDIVE_STATE_KEY] = new_state
                         
                         # トークン使用量を表示
@@ -414,12 +444,13 @@ def main():
                                 reason = new_state["self_reflection"].reason
                                 st.success(f"探索完了！理由: {reason}")
                             else:
-                                st.success("探索完了！")
+                                st.success("探索完了！セルフリフレクションは裏で実行されており会話は終了できます。")
                         
                         # UIを更新するためにページを再読み込み
                         st.rerun()
                     except Exception as e:
                         st.error(f"エラー: {str(e)}")
+                        st.rerun()
         
         with col2:
             st.subheader("ROIツリー")
@@ -473,10 +504,10 @@ def main():
             col1, col2 = st.columns([3, 2])
             
             with col1:
-                # チャット履歴コンテナ
+                st.subheader("チャット")
                 chat_container = st.container()
                 
-                # メッセージを表示
+                # メッセージを表示（チャット形式）
                 display_messages(state["messages"], chat_container)
                 
                 # ストリーミング出力用のコンテナを作成
@@ -486,65 +517,69 @@ def main():
                 if "process_proposal_input" not in st.session_state:
                     st.session_state.process_proposal_input = False
                     st.session_state.proposal_input_value = ""
+                    
+                # 送信ボタンをクリックしたときの処理
+                def submit_proposal_input():
+                    st.session_state.process_proposal_input = True
+                    st.session_state.proposal_input_value = st.session_state.proposal_input
+                    
+                # ユーザー入力フィールド
+                st.text_input("メッセージを入力してください:", key="proposal_input", on_change=submit_proposal_input)
                 
-            # 送信ボタンをクリックしたときの処理
-            def submit_proposal_input():
-                st.session_state.process_proposal_input = True
-                st.session_state.proposal_input_value = st.session_state.proposal_input
-                
-            # ユーザー入力フィールド
-            st.text_input("メッセージを入力してください:", key="proposal_input", on_change=submit_proposal_input)
-            
-            # 入力が処理待ちの場合
-            if st.session_state.process_proposal_input:
-                user_input = st.session_state.proposal_input_value
-                
-                # フラグをリセット
-                st.session_state.process_proposal_input = False
-                st.session_state.proposal_input_value = ""
-                
-                # ユーザーメッセージを追加
-                state["messages"].append(HumanMessage(content=user_input))
-                st.session_state[PROPOSAL_STATE_KEY] = state
+                # 入力が処理待ちの場合
+                if st.session_state.process_proposal_input:
+                    user_input = st.session_state.proposal_input_value
+                    
+                    # フラグをリセット
+                    st.session_state.process_proposal_input = False
+                    st.session_state.proposal_input_value = ""
+                    
+                    # ユーザーメッセージを追加
+                    user_message = HumanMessage(content=user_input)
+                    state["messages"].append(user_message)
+                    st.session_state[PROPOSAL_STATE_KEY] = state
+                    
+                    # 会話をすぐに表示（レスポンス生成前）
+                    chat_container.chat_message("user").markdown(user_input)
                     
                     # セルフリフレクション実行（ステータス判定のみ）
-                proposal_graph = build_proposal_graph()
+                    proposal_graph = build_proposal_graph()
                     
-                with get_openai_callback() as cb:
-                    # レスポンスをストリーミング
-                    stream_handler = StreamHandler(stream_container)
-                    
-                    try:
-                        self_reflect_proposal = reflection_manager.get_all_reflections()
-                        # 最初に入力されたメッセージに基づく応答を生成
-                        new_state = run_one_step(proposal_graph, state, stream_handler)
+                    with get_openai_callback() as cb:
+                        # レスポンスをストリーミング
+                        stream_handler = StreamHandler(stream_container)
                         
-                        # 直後にセルフリフレクションを実行（裏側で実行）
-                        reflection_state = new_state.copy()
-                        reflection_state = self_reflect_proposal(reflection_state)
+                        try:
+                            # 最初に入力されたメッセージに基づく応答を生成
+                            new_state = run_one_step(proposal_graph, state, stream_handler)
+                            
+                            # 直後にセルフリフレクションを実行（裏側で実行）
+                            reflection_state = new_state.copy()
+                            reflection_state = self_reflect_proposal(reflection_state)
+                            
+                            # 会話終了判定だけをオリジナル状態に反映
+                            new_state["self_reflection"] = reflection_state["self_reflection"]
+                            new_state["proposal_complete"] = reflection_state["proposal_complete"]
+                            
+                            # 状態を更新
+                            st.session_state[PROPOSAL_STATE_KEY] = new_state
+                            
+                            # トークン使用量を表示
+                            st.caption(f"使用トークン: {cb.total_tokens} (¥{cb.total_cost*130:.2f})")
                         
-                        # 会話終了判定だけをオリジナル状態に反映
-                        new_state["self_reflection"] = reflection_state["self_reflection"]
-                        new_state["proposal_complete"] = reflection_state["proposal_complete"]
-                        
-                        # 状態を更新
-                        st.session_state[PROPOSAL_STATE_KEY] = new_state
-                        
-                        # トークン使用量を表示
-                        st.caption(f"使用トークン: {cb.total_tokens} (¥{cb.total_cost*130:.2f})")
-                    
-                        # 提案が完了したかチェック
-                        if new_state["proposal_complete"]:
-                            if new_state["self_reflection"]:
-                                reason = new_state["self_reflection"].reason
-                                st.success(f"提案完了！理由: {reason}")
-                            else:
-                                st.success("提案完了！セルフリフレクションは裏で実行されており会話は終了できます。")
-                        
-                        # UIを更新するためにページを再読み込み
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"エラー: {str(e)}")
+                            # 提案が完了したかチェック
+                            if new_state["proposal_complete"]:
+                                if new_state["self_reflection"]:
+                                    reason = new_state["self_reflection"].reason
+                                    st.success(f"提案完了！理由: {reason}")
+                                else:
+                                    st.success("提案完了！セルフリフレクションは裏で実行されており会話は終了できます。")
+                            
+                            # UIを更新するためにページを再読み込み
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"エラー: {str(e)}")
+                            st.rerun()
             
             with col2:
                 st.subheader("ROI計算")
@@ -565,6 +600,6 @@ def main():
                             st.markdown(f"- {item}")
 
 
-# Run the app
+# アプリを実行
 if __name__ == "__main__":
     main()

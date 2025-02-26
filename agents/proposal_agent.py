@@ -24,33 +24,33 @@ from utils.visualization import (
 # 反省管理の共有インスタンスを使用
 from agents.deepdive_agent import reflection_manager
 
-# Initialize LLM
+# LLMの初期化
 model = ChatOpenAI(
     model="gpt-4",
-    temperature=0.2,  # Lower temperature for more consistent, focused responses
-    streaming=True    # Enable streaming for real-time output
+    temperature=0.2,  # 一貫性の高い応答のための低い温度
+    streaming=True    # リアルタイム出力のためのストリーミング
 )
 analysis_model = model
-reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # Even lower temp for reflection
+reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # 反省にはさらに低い温度
 
 # タスク反省機能を初期化
 task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
 
 
 # =========================
-# Helper Functions
+# ヘルパー関数
 # =========================
 
 def get_next_node_to_analyze(state: ProposalState) -> Optional[str]:
     """
-    Find the next node that should be analyzed
+    次に分析すべきノードを見つける
     
-    Strategy: 
-    1. Start with leaf nodes
-    2. Once all children of a parent are analyzed, analyze the parent
+    戦略: 
+    1. まず葉ノードから始める
+    2. 親のすべての子が分析されたら、親を分析する
     
     Returns:
-        Node ID of the next node to analyze, or None if all nodes are analyzed
+        分析するノードのID、またはすべてのノードが分析済みの場合はNone
     """
     if not state["root_node"]:
         return None
@@ -58,29 +58,29 @@ def get_next_node_to_analyze(state: ProposalState) -> Optional[str]:
     nodes_dict = build_nodes_dictionary(state["root_node"])
     analyzed_nodes = set(state["analyzed_nodes"])
     
-    # Helper function to check if a node and all its descendants are analyzed
+    # ノードとその子孫がすべて分析されているかをチェックするヘルパー関数
     def is_subtree_analyzed(node: ROINode) -> bool:
         if node.node_id not in analyzed_nodes:
             return False
             
         return all(is_subtree_analyzed(child) for child in node.children)
     
-    # Helper function to find next node to analyze
+    # 次に分析するノードを見つけるヘルパー関数
     def find_next_node(node: ROINode) -> Optional[str]:
-        # If this node has no children (leaf node) and isn't analyzed, analyze it
+        # このノードに子がなく（葉ノード）、まだ分析されていなければ、分析する
         if not node.children and node.node_id not in analyzed_nodes:
             return node.node_id
             
-        # If this node has children, first make sure all children are analyzed
+        # このノードに子がある場合、まずすべての子が分析されていることを確認
         for child in node.children:
             if not is_subtree_analyzed(child):
                 return find_next_node(child)
                 
-        # If all children are analyzed but this node isn't, analyze it
+        # すべての子が分析済みだがこのノードがまだ分析されていない場合、分析する
         if node.node_id not in analyzed_nodes:
             return node.node_id
             
-        # Everything in this subtree is analyzed
+        # このサブツリーはすべて分析済み
         return None
     
     return find_next_node(state["root_node"])
@@ -88,46 +88,46 @@ def get_next_node_to_analyze(state: ProposalState) -> Optional[str]:
 
 def get_node_analysis_context(state: ProposalState, node_id: str) -> Dict[str, Any]:
     """
-    Get the context needed for analyzing a specific node
+    特定のノードを分析するために必要なコンテキストを取得
     
     Returns:
-        Dictionary with context information for the node
+        ノードのコンテキスト情報を含む辞書
     """
     node = state["root_node"].find_node_by_id(node_id)
     if not node:
         return {
-            "current_node_name": "Unknown Node",
-            "current_node_details": "Node not found",
+            "current_node_name": "不明なノード",
+            "current_node_details": "ノードが見つかりません",
             "current_node_importance": 0,
-            "child_nodes_description": "No children",
-            "node_context": "Node not found in the ROI tree"
+            "child_nodes_description": "子ノードなし",
+            "node_context": "ROIツリーにノードが見つかりません"
         }
     
-    # Get node details
+    # ノード詳細を取得
     current_node_name = node.name
-    current_node_details = node.details or "No details available"
+    current_node_details = node.details or "詳細情報なし"
     current_node_importance = f"{node.importance_factor:.1%}"
     
-    # Get child nodes description
-    child_nodes_description = "No child nodes"
+    # 子ノード説明を取得
+    child_nodes_description = "子ノードなし"
     if node.children:
         child_lines = []
         for child in node.children:
-            child_line = f"- {child.name} (Importance: {child.importance_factor:.1%})"
+            child_line = f"- {child.name} (重要度: {child.importance_factor:.1%})"
             if child.details:
-                child_line += f"\n  Details: {child.details}"
+                child_line += f"\n  詳細: {child.details}"
             child_lines.append(child_line)
         child_nodes_description = "\n".join(child_lines)
     
-    # Get overall context in the tree
+    # ツリー全体におけるコンテキストを取得
     nodes_dict = build_nodes_dictionary(state["root_node"])
     
-    # Build a path to this node (simplified implementation)
+    # このノードへのパスを構築（簡易実装）
     path = []
     current = node
     parent_map = {}
     
-    # Build a map of nodes to their parents
+    # ノードと親のマップを構築
     def build_parent_map(node: ROINode, parent: Optional[ROINode] = None):
         if parent:
             parent_map[node.node_id] = parent
@@ -136,7 +136,7 @@ def get_node_analysis_context(state: ProposalState, node_id: str) -> Dict[str, A
     
     build_parent_map(state["root_node"])
     
-    # Build the path
+    # パスを構築
     current_id = node.node_id
     while current_id in parent_map:
         parent = parent_map[current_id]
@@ -144,7 +144,7 @@ def get_node_analysis_context(state: ProposalState, node_id: str) -> Dict[str, A
         current_id = parent.node_id
     
     path.append(node.name)
-    node_context = "Path: " + " > ".join(path)
+    node_context = "パス: " + " > ".join(path)
     
     return {
         "current_node_name": current_node_name,
@@ -157,41 +157,41 @@ def get_node_analysis_context(state: ProposalState, node_id: str) -> Dict[str, A
 
 def update_node_values(state: ProposalState, calculations: List[ROICalculation]) -> ProposalState:
     """
-    Update node values based on ROI calculations
+    ROI計算に基づいてノード値を更新
     
     Args:
-        state: Current state
-        calculations: List of ROI calculations
+        state: 現在の状態
+        calculations: ROI計算のリスト
         
     Returns:
-        Updated state
+        更新された状態
     """
     if not calculations:
         return state
     
-    # For each calculation, find the corresponding node and update its value
+    # 各計算について、対応するノードを見つけて値を更新
     nodes_dict = build_nodes_dictionary(state["root_node"])
     
     for calc in calculations:
         node_id = calc.node_id
         
-        # If node_id is "auto", try to find node by name
+        # node_idが "auto" の場合、名前でノードを検索
         if node_id == "auto":
             for nid, node in nodes_dict.items():
                 if node.name.lower() == calc.name.lower():
                     node_id = nid
                     break
         
-        # Update the node if found
+        # ノードが見つかった場合、更新
         if node_id in nodes_dict:
             node = nodes_dict[node_id]
             node.value = calc.estimated_value
             
-            # Add to analyzed nodes
+            # 分析済みノードに追加
             if node_id not in state["analyzed_nodes"]:
                 state["analyzed_nodes"].append(node_id)
         
-        # Store calculation in the state
+        # 計算を状態に保存
         if node_id not in state["roi_calculations"]:
             state["roi_calculations"][node_id] = {
                 "name": calc.name,
@@ -200,7 +200,7 @@ def update_node_values(state: ProposalState, calculations: List[ROICalculation])
                 "assumptions": calc.assumptions
             }
     
-    # Calculate ROI for the whole tree
+    # ツリー全体のROIを計算
     if state["root_node"]:
         roi_result = state["root_node"].calculate_roi()
         state["roi_calculations"]["summary"] = roi_result
@@ -209,7 +209,7 @@ def update_node_values(state: ProposalState, calculations: List[ROICalculation])
 
 
 # =========================
-# Graph nodes (agent steps)
+# グラフノード（エージェントステップ）
 # =========================
 
 def propose_solutions(state: ProposalState) -> ProposalState:
@@ -220,13 +220,13 @@ def propose_solutions(state: ProposalState) -> ProposalState:
     next_node_id = state["current_node_id"] or get_next_node_to_analyze(state)
     
     if not next_node_id:
-        # No more nodes to analyze
+        # 分析するノードがもうない
         if "summary" not in state["roi_calculations"]:
-            # Calculate final ROI
+            # 最終ROIを計算
             roi_result = state["root_node"].calculate_roi()
             state["roi_calculations"]["summary"] = roi_result
             
-        # Create a message summarizing the ROI
+        # ROIをまとめるメッセージを作成
         summary = state["roi_calculations"].get("summary", {})
         summary_text = f"""
 分析に基づいて、最終的なROIサマリーは以下のとおりです:
@@ -235,7 +235,7 @@ def propose_solutions(state: ProposalState) -> ProposalState:
 
 主要コンポーネント:
 """
-        # Add major components
+        # 主要コンポーネントを追加
         for child in summary.get('children_values', []):
             summary_text += f"- {child['name']}: ¥{child['weighted_value']*1000:,.0f} (全体の{child['importance_factor']:.1%})\n"
         
@@ -245,10 +245,10 @@ def propose_solutions(state: ProposalState) -> ProposalState:
         
         return state
     
-    # Update current node
+    # 現在のノードを更新
     state["current_node_id"] = next_node_id
     
-    # Get context for this node
+    # このノードのコンテキストを取得
     context = get_node_analysis_context(state, next_node_id)
     
     # 関連する過去のリフレクションを取得
@@ -439,23 +439,23 @@ def self_reflect_proposal(state: ProposalState) -> ProposalState:
 
 
 def should_continue_proposal(state: ProposalState) -> Literal["continue", "__end__"]:
-    """Decide whether to continue analysis or end"""
+    """分析を続けるかどうかを決定"""
     return "continue" if not state["proposal_complete"] else "__end__"
 
 
 # =========================
-# Graph construction
+# グラフ構築
 # =========================
 
-def build_proposal_graph() -> Any:  # Using Any for the return type to avoid circular imports
-    """Build and compile the proposal agent graph"""
+def build_proposal_graph() -> Any:  # 循環インポートを避けるためAny型を使用
+    """提案エージェントグラフを構築してコンパイル"""
     graph = StateGraph(ProposalState)
     
-    # Add nodes
+    # ノード追加
     graph.add_node("propose_solutions", propose_solutions)
     graph.add_node("self_reflect_proposal", self_reflect_proposal)
     
-    # Add edges
+    # エッジ追加
     graph.add_edge("propose_solutions", "self_reflect_proposal")
     graph.add_conditional_edges(
         "self_reflect_proposal",
@@ -472,7 +472,7 @@ def build_proposal_graph() -> Any:  # Using Any for the return type to avoid cir
 
 
 def init_proposal_state(root_node: ROINode) -> ProposalState:
-    """Initialize the proposal state"""
+    """提案状態を初期化"""
     return ProposalState(
         messages=[],
         root_node=root_node,
