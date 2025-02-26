@@ -10,10 +10,14 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_community.callbacks import get_openai_callback
 
-# LangSmithのトレースを無効化
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
-os.environ["LANGCHAIN_ENDPOINT"] = ""
-os.environ["LANGCHAIN_API_KEY"] = ""
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+# プロジェクト名を設定（オプション）
+os.environ["LANGCHAIN_PROJECT"] = "roi_tree_explorer"
+
+from langchain.callbacks import get_openai_callback
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain.callbacks.base import BaseCallbackHandler
 
 from agents.deepdive_agent import build_deepdive_graph, init_deepdive_state
 from agents.proposal_agent import build_proposal_graph, init_proposal_state
@@ -95,7 +99,7 @@ def run_one_step(app, current_state, stream_handler=None):
 
 def display_messages(messages: List[Any], container):
     """
-    Streamlitコンテナに会話メッセージを表示
+    Streamlitコンテナに会話メッセージを表示（チャットの形式で）
     
     Args:
         messages: メッセージリスト
@@ -240,10 +244,10 @@ def main():
         col1, col2 = st.columns([3, 2])
         
         with col1:
-            # チャット履歴コンテナ
+            st.subheader("チャット")
             chat_container = st.container()
             
-            # メッセージを表示
+            # メッセージを表示（チャット形式）
             display_messages(state["messages"], chat_container)
             
             # ストリーミング出力用のコンテナを作成
@@ -271,8 +275,12 @@ def main():
                 st.session_state.deepdive_input_value = ""
                 
                 # ユーザーメッセージを追加
-                state["messages"].append(HumanMessage(content=user_input))
+                user_message = HumanMessage(content=user_input)
+                state["messages"].append(user_message)
                 st.session_state[DEEPDIVE_STATE_KEY] = state
+                
+                # 会話をすぐに表示（レスポンス生成前）
+                chat_container.chat_message("user").markdown(user_input)
                 
                 # グラフを作成
                 deepdive_graph = build_deepdive_graph()
@@ -282,12 +290,15 @@ def main():
                     stream_handler = StreamHandler(stream_container)
                     
                     try:
+                        # エージェントの応答を追加
                         new_state = run_one_step(deepdive_graph, state, stream_handler)
+                        
+                        # 最新の状態をセッションに保存
                         st.session_state[DEEPDIVE_STATE_KEY] = new_state
                         
                         # トークン使用量を表示
                         st.caption(f"使用トークン: {cb.total_tokens} (¥{cb.total_cost*130:.2f})")
-                        
+                    
                         # 探索が完了したかチェック
                         if new_state["exploration_complete"]:
                             if new_state["self_reflection"]:
@@ -361,11 +372,11 @@ def main():
                 
                 # ストリーミング出力用のコンテナを作成
                 stream_container = st.empty()
-            
-            # 入力処理用のフラグを初期化
-            if "process_proposal_input" not in st.session_state:
-                st.session_state.process_proposal_input = False
-                st.session_state.proposal_input_value = ""
+                
+                # 入力処理用のフラグを初期化
+                if "process_proposal_input" not in st.session_state:
+                    st.session_state.process_proposal_input = False
+                    st.session_state.proposal_input_value = ""
                 
             # 送信ボタンをクリックしたときの処理
             def submit_proposal_input():
@@ -395,7 +406,10 @@ def main():
                     stream_handler = StreamHandler(stream_container)
                     
                     try:
+                        # エージェントの応答を追加
                         new_state = run_one_step(proposal_graph, state, stream_handler)
+                        
+                        # 最新の状態をセッションに保存
                         st.session_state[PROPOSAL_STATE_KEY] = new_state
                         
                         # トークン使用量を表示

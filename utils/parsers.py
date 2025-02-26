@@ -11,35 +11,62 @@ from domain.schemas import ROINodeUpdate, ROIAnalysis, ROICalculation, ProposalA
 
 def extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
     """
-    Extract JSON from text, handling various formats the LLM might output
+    テキストからJSONを抽出する（LLMが出力する可能性のある様々なフォーマットに対応）
     
     Args:
-        text: Text potentially containing JSON
+        text: JSONを含む可能性のあるテキスト
         
     Returns:
-        Extracted JSON as a dictionary, or None if no valid JSON found
+        抽出されたJSONを辞書として、または有効なJSONが見つからない場合はNone
     """
-    # Try to find JSON between triple backticks
+    # まず、テキスト全体をJSONとして解析を試みる
+    try:
+        # 行頭と行末の不要な空白を削除
+        cleaned_text = text.strip()
+        if cleaned_text.startswith("{") and cleaned_text.endswith("}"):
+            return json.loads(cleaned_text)
+    except json.JSONDecodeError:
+        pass
+    
+    # トリプルバッククォート間のJSONを探す
     json_pattern = r"```(?:json)?(.*?)```"
     matches = re.findall(json_pattern, text, re.DOTALL)
     
     if matches:
         for match in matches:
             try:
-                return json.loads(match.strip())
+                # 余分な空白や改行を取り除く
+                cleaned_json = match.strip()
+                return json.loads(cleaned_json)
             except json.JSONDecodeError:
                 continue
     
-    # Try to find JSON between curly braces
-    json_pattern = r"\{.*\}"
+    # 中括弧間のJSONを探す - 最も厳密な一致を試みる
+    json_pattern = r"\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}"
     matches = re.findall(json_pattern, text, re.DOTALL)
     
     if matches:
         for match in matches:
             try:
-                return json.loads(match)
+                # 完全なJSON文字列を再構成
+                json_str = "{" + match + "}"
+                # 改行と余分な空白を削除
+                json_str = re.sub(r'\s+', ' ', json_str)
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 continue
+    
+    # もっと緩いパターンで再試行
+    try:
+        # テキスト内のすべての改行を削除
+        no_newlines = re.sub(r'\s+', ' ', text)
+        # JSON部分を抽出する正規表現
+        match = re.search(r'\{.*\}', no_newlines)
+        if match:
+            json_str = match.group(0)
+            return json.loads(json_str)
+    except (json.JSONDecodeError, AttributeError):
+        pass
     
     return None
 

@@ -11,7 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from domain.schemas import ProposalState, ROICalculation, ProposalAnalysis
 from domain.roitree import ROINode
-from agents.prompts import PROPOSAL_ANALYSIS_PROMPT, PROPOSAL_REFLECTION_PROMPT
+from agents.prompts import PROPOSAL_ANALYSIS_PROMPT, PROPOSAL_REFLECTION_PROMPT, PROPOSAL_SYSTEM_PROMPT
 from utils.parsers import parse_roi_calculation, parse_proposal_reflection
 from utils.visualization import (
     format_tree_for_display,
@@ -207,71 +207,91 @@ def update_node_values(state: ProposalState, calculations: List[ROICalculation])
 
 def propose_solutions(state: ProposalState) -> ProposalState:
     """
-    Analyze ROI for specific nodes and update the tree
+    特定のノードのROIを分析し、ツリーを更新する
     """
-    # Find the next node to analyze
+    # 次に分析するノードを見つける
     next_node_id = state["current_node_id"] or get_next_node_to_analyze(state)
     
     if not next_node_id:
-        # No more nodes to analyze
+        # 分析するノードがもうない
         if "summary" not in state["roi_calculations"]:
-            # Calculate final ROI
+            # 最終ROIを計算
             roi_result = state["root_node"].calculate_roi()
             state["roi_calculations"]["summary"] = roi_result
             
-        # Create a message summarizing the ROI
+        # ROIをまとめるメッセージを作成
         summary = state["roi_calculations"].get("summary", {})
         summary_text = f"""
-Based on our analysis, here's the final ROI summary:
+分析に基づいて、最終的なROIサマリーは以下のとおりです:
 
-Total Potential Value: ${summary.get('weighted_value', 0):,.2f}
+総合的な潜在価値: ¥{summary.get('weighted_value', 0)*1000:,.0f}
 
-Key Components:
+主要コンポーネント:
 """
-        # Add major components
+        # 主要コンポーネントを追加
         for child in summary.get('children_values', []):
-            summary_text += f"- {child['name']}: ${child['weighted_value']:,.2f} ({child['importance_factor']:.1%} of total)\n"
+            summary_text += f"- {child['name']}: ¥{child['weighted_value']*1000:,.0f} (全体の{child['importance_factor']:.1%})\n"
         
         state["messages"].append(
-            SystemMessage(content=f"All nodes have been analyzed. {summary_text}")
+            SystemMessage(content=f"すべてのノードの分析が完了しました。{summary_text}")
         )
         
         return state
     
-    # Update current node
+    # 現在のノードを更新
     state["current_node_id"] = next_node_id
     
-    # Get context for this node
+    # このノードのコンテキストを取得
     context = get_node_analysis_context(state, next_node_id)
     
-    # Generate analysis for this node
-    response = analysis_model.invoke(
-        PROPOSAL_ANALYSIS_PROMPT.format(
-            messages=state["messages"],
-            current_node_name=context["current_node_name"],
-            current_node_details=context["current_node_details"],
-            current_node_importance=context["current_node_importance"],
-            child_nodes_description=context["child_nodes_description"],
-            node_context=context["node_context"]
-        )
-    )
+    # 明示的に日本語で応答するよう指示を追加
+    system_message = SystemMessage(content=PROPOSAL_SYSTEM_PROMPT + "\n\n特に重要: すべての応答は必ず日本語で行ってください。")
     
-    # Update messages
+    messages = state["messages"] + [
+        HumanMessage(content=f"""
+ROIツリーの以下のノードについてROIを推定しましょう:
+
+ノード: {context["current_node_name"]}
+説明: {context["current_node_details"]}
+重要度係数: {context["current_node_importance"]}
+
+子ノード（存在する場合）:
+{context["child_nodes_description"]}
+
+ROIツリー全体におけるコンテキスト:
+{context["node_context"]}
+
+このコンポーネントの潜在的価値を見積もるのを手伝ってください。十分な情報に基づいた見積もりをするために必要な質問をするか、利用可能な情報に基づいて推奨事項を提供してください。
+
+各見積もりについて、以下を提供してください:
+1. 見積もり価値（金銭的な観点で）
+2. 信頼度レベル（0-100%）
+3. 見積もりの背後にある主要な前提条件
+4. 時間的考慮（一回限りか継続的か、いつ利益が実現されるか）
+
+必ず日本語で回答してください。
+""")
+    ]
+    
+    # このノードの分析を生成
+    response = analysis_model.invoke([system_message] + messages)
+    
+    # メッセージを更新
     state["messages"].append(
-        HumanMessage(content=f"Let's analyze the ROI for '{context['current_node_name']}'.")
+        HumanMessage(content=f"「{context['current_node_name']}」のROIを分析しましょう。")
     )
     state["messages"].append(response)
     
-    # Parse the response to extract ROI calculations
+    # 応答を解析してROI計算を抽出
     calculations = parse_roi_calculation(response)
     
     if calculations:
-        # Update node IDs for the calculations
+        # 計算のノードIDを更新
         for calc in calculations:
             if calc.node_id == "auto":
                 calc.node_id = next_node_id
         
-        # Update the ROI values in the tree
+        # ツリーのROI値を更新
         state = update_node_values(state, calculations)
     
     return state
@@ -279,14 +299,14 @@ Key Components:
 
 def self_reflect_proposal(state: ProposalState) -> ProposalState:
     """
-    Evaluate if the ROI analysis is complete and sufficient
+    ROI分析が完了し十分かどうかを評価する
     """
-    # Prepare context for self-reflection
+    # 自己反省のコンテキストを準備
     nodes_dict = build_nodes_dictionary(state["root_node"])
     total_nodes = len(nodes_dict)
     analyzed_nodes_count = len(state["analyzed_nodes"])
     
-    # Count nodes missing estimates
+    # 見積りが不足しているノードをカウント
     missing_estimates = []
     for node_id, node in nodes_dict.items():
         if node.value is None:
@@ -294,32 +314,38 @@ def self_reflect_proposal(state: ProposalState) -> ProposalState:
     
     missing_estimates_count = len(missing_estimates)
     
-    # Format ROI summary
-    roi_summary = "No ROI calculations performed yet"
+    # ROIサマリーを整形
+    roi_summary = "まだROI計算は実行されていません"
     if "summary" in state["roi_calculations"]:
         summary = state["roi_calculations"]["summary"]
         roi_summary = format_roi_calculation(summary)
     
-    # Generate the reflection prompt
+    # 反省プロンプトを生成
     reflection_input = PROPOSAL_REFLECTION_PROMPT.format(
-        messages=state["messages"][-5:],  # Only use recent messages for context
+        messages=state["messages"][-5:],  # コンテキストには最近のメッセージのみ使用
         roi_calculation_summary=roi_summary,
         analyzed_nodes_count=analyzed_nodes_count,
         total_nodes_count=total_nodes,
         missing_estimates_count=missing_estimates_count
     )
     
-    # Get reflection from LLM
-    reflection_response = reflection_model.invoke(reflection_input)
-    
-    # Parse the reflection
-    success, analysis = parse_proposal_reflection(reflection_response)
-    
-    if success and analysis:
-        state["self_reflection"] = analysis
-        state["proposal_complete"] = analysis.proposal_complete
-    else:
-        # Fallback if parsing fails
+    try:
+        # LLMから反省を取得
+        reflection_response = reflection_model.invoke(reflection_input)
+        
+        # 反省を解析
+        success, analysis = parse_proposal_reflection(reflection_response)
+        
+        if success and analysis:
+            state["self_reflection"] = analysis
+            state["proposal_complete"] = analysis.proposal_complete
+        else:
+            # 解析に失敗した場合のフォールバック
+            state["iteration_count"] += 1
+            state["proposal_complete"] = state["iteration_count"] >= state["max_iterations"]
+    except Exception as e:
+        print(f"自己反省中にエラーが発生しました: {str(e)}")
+        # エラーの場合のフォールバック
         state["iteration_count"] += 1
         state["proposal_complete"] = state["iteration_count"] >= state["max_iterations"]
     

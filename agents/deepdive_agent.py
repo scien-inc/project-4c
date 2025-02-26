@@ -11,7 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from domain.schemas import DeepdiveState, ROINodeUpdate, ROIAnalysis, NodePath
 from domain.roitree import ROINode, create_default_roi_tree
-from agents.prompts import DEEPDIVE_EXPLORATION_PROMPT, DEEPDIVE_REFLECTION_PROMPT
+from agents.prompts import DEEPDIVE_EXPLORATION_PROMPT, DEEPDIVE_REFLECTION_PROMPT, DEEPDIVE_SYSTEM_PROMPT
 from utils.parsers import parse_roi_node_update, parse_reflection_analysis
 from utils.visualization import (
     format_tree_for_display, 
@@ -158,43 +158,55 @@ def update_roi_tree(
 
 def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
     """
-    Engage in ROI tree exploration conversation with the user
+    ユーザーと対話し、ROIツリー探索を行う
     """
-    # Get current node information
+    # 現在のノード情報を取得
     current_node = None
-    current_node_name = "Root"
-    current_node_details = "Top-level ROI components"
+    current_node_name = "ルート"
+    current_node_details = "トップレベルのROIコンポーネント"
     
     if state["current_node_id"]:
         current_node = find_node_by_path(state["root_node"], state["node_path"])
         if current_node:
             current_node_name = current_node.name
-            current_node_details = current_node.details or "No details available"
+            current_node_details = current_node.details or "詳細情報なし"
     
-    # Get tree context for the prompt
+    # プロンプト用のツリーコンテキストを取得
     tree_context = get_tree_context(state)
     
-    # Generate response using the exploration prompt
-    response = exploration_model.invoke(
-        DEEPDIVE_EXPLORATION_PROMPT.format(
-            messages=state["messages"],
-            tree_context=tree_context,
-            current_node_name=current_node_name,
-            current_node_details=current_node_details
-        )
-    )
+    # 探索プロンプトを使用して応答を生成
+    # 明示的に日本語で応答するよう指示を追加
+    system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + "\n\n特に重要: すべての応答は必ず日本語で行ってください。")
     
-    # Update the messages
+    messages = state["messages"] + [
+        HumanMessage(content=f"""
+現在のROIツリーコンテキスト:
+{tree_context}
+
+現在のフォーカス: {current_node_name}
+説明: {current_node_details}
+
+このROIツリーの側面をさらに探索するのを手伝ってください。サブコンポーネントを特定するための的を絞った質問をするか、適切な場合は新しいブランチを提案してください。
+
+重要度係数について考えることを忘れないでください - 各サブコンポーネントは兄弟コンポーネントと比較してどの程度重要ですか？重要度係数は兄弟間で合計100%になるようにしてください。
+
+必ず日本語で回答してください。
+""")
+    ]
+    
+    response = exploration_model.invoke([system_message] + messages)
+    
+    # メッセージを更新
     state["messages"].append(
-        HumanMessage(content=f"Let's explore '{current_node_name}' further.")
+        HumanMessage(content=f"「{current_node_name}」についてさらに詳しく教えてください。")
     )
     state["messages"].append(response)
     
-    # Parse the response to extract node updates
+    # 応答を解析してノード更新を抽出
     updates = parse_roi_node_update(response)
     
     if updates:
-        # Apply updates to the ROI tree
+        # ROIツリーに更新を適用
         state, update_descriptions = update_roi_tree(state, updates)
     
     return state
@@ -202,16 +214,16 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
 
 def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
     """
-    Use LLM to evaluate if the ROI tree exploration is sufficient
+    LLMを使用してROIツリー探索が十分かどうかを評価する
     """
-    # Prepare context for self-reflection
+    # 自己反省のコンテキストを準備
     tree_stats = get_tree_statistics(state["root_node"])
     
-    # Get the full tree representation
+    # 完全なツリー表現を取得
     full_tree = format_tree_for_display(state["root_node"])
     mermaid_diagram = generate_mermaid_diagram(state["root_node"])
     
-    # Convert exploration history to readable format
+    # 探索履歴を読みやすいフォーマットに変換
     nodes_dict = build_nodes_dictionary(state["root_node"])
     exploration_history = []
     
@@ -219,9 +231,9 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
         if node_id in nodes_dict:
             exploration_history.append(nodes_dict[node_id].name)
     
-    # Generate the reflection prompt
+    # 反省プロンプトを生成
     reflection_input = DEEPDIVE_REFLECTION_PROMPT.format(
-        messages=state["messages"][-5:],  # Only use recent messages for context
+        messages=state["messages"][-5:],  # コンテキストには最近のメッセージのみ使用
         full_tree_representation=full_tree,
         exploration_history=", ".join(exploration_history),
         total_nodes=tree_stats["total_nodes"],
@@ -230,28 +242,34 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
         shallow_branches=", ".join(tree_stats["shallow_branches"])
     )
     
-    # Get reflection from LLM
-    reflection_response = reflection_model.invoke(reflection_input)
-    
-    # Parse the reflection
-    success, analysis = parse_reflection_analysis(reflection_response)
-    
-    if success and analysis:
-        state["self_reflection"] = analysis
-        state["exploration_complete"] = not analysis.deepdive_needed
+    try:
+        # LLMから反省を取得
+        reflection_response = reflection_model.invoke(reflection_input)
         
-        # If a focus is suggested, try to navigate to that node
-        if analysis.suggested_focus and not state["exploration_complete"]:
-            # Try to find the node by name first (simple implementation)
-            nodes_dict = build_nodes_dictionary(state["root_node"])
-            for node_id, node in nodes_dict.items():
-                if node.name.lower() == analysis.suggested_focus.lower():
-                    state["current_node_id"] = node_id
-                    # Rebuild the path to this node (simplified)
-                    state["node_path"] = [state["root_node"].node_id, node_id]
-                    break
-    else:
-        # Fallback if parsing fails
+        # 反省を解析
+        success, analysis = parse_reflection_analysis(reflection_response)
+        
+        if success and analysis:
+            state["self_reflection"] = analysis
+            state["exploration_complete"] = not analysis.deepdive_needed
+            
+            # フォーカスが提案されており、探索が完了していない場合、そのノードに移動を試みる
+            if analysis.suggested_focus and not state["exploration_complete"]:
+                # まず名前でノードを検索（簡易実装）
+                nodes_dict = build_nodes_dictionary(state["root_node"])
+                for node_id, node in nodes_dict.items():
+                    if node.name.lower() == analysis.suggested_focus.lower():
+                        state["current_node_id"] = node_id
+                        # このノードへのパスを再構築（簡易化）
+                        state["node_path"] = [state["root_node"].node_id, node_id]
+                        break
+        else:
+            # 解析に失敗した場合のフォールバック
+            state["iteration_count"] += 1
+            state["exploration_complete"] = state["iteration_count"] >= state["max_iterations"]
+    except Exception as e:
+        print(f"自己反省中にエラーが発生しました: {str(e)}")
+        # エラーの場合のフォールバック
         state["iteration_count"] += 1
         state["exploration_complete"] = state["iteration_count"] >= state["max_iterations"]
     

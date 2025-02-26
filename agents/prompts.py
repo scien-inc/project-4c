@@ -46,45 +46,42 @@ Remember to think about importance factors - how significant is each sub-compone
 ])
 
 DEEPDIVE_REFLECTION_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert at evaluating the completeness of ROI tree analysis. 
-Your job is to determine whether a branch of the ROI tree has been sufficiently explored.
+    ("system", """あなたはROIツリー分析の完全性を評価する専門家です。
+あなたの仕事はROIツリーのブランチが十分に探索されたかどうかを判断することです。
 
-A well-explored branch should:
-1. Have appropriate depth (usually 3-4 levels)
-2. Contain specific, measurable elements at leaf nodes
-3. Cover the major components of the category
-4. Have reasonable importance factors assigned between siblings
+十分に探索されたブランチは以下の特徴を持つべきです:
+1. 適切な深さ（通常3〜4レベル）
+2. 葉ノードに具体的で測定可能な要素を含む
+3. カテゴリの主要コンポーネントをカバーしている
+4. 兄弟間で合理的な重要度係数が割り当てられている
+
+正確な単一行のJSON形式で応答してください。改行を含めないでください。
 """),
     MessagesPlaceholder(variable_name="messages"),
     ("human", """
-Evaluate the current state of our ROI tree exploration:
+ROIツリー探索の現状を評価してください:
 
-Current Tree Structure:
+現在のツリー構造:
 {full_tree_representation}
 
-Exploration History:
+探索履歴:
 {exploration_history}
 
-Current Statistics:
-- Total nodes: {total_nodes}
-- Max depth: {max_depth}
-- Branches with < {min_nodes_per_branch} nodes: {shallow_branches}
+現在の統計:
+- 合計ノード数: {total_nodes}
+- 最大深度: {max_depth}
+- {min_nodes_per_branch}ノード未満のブランチ: {shallow_branches}
 
-Based on this information, please assess:
-1. Is further exploration needed? (true/false)
-2. What's your reasoning?
-3. If more exploration is needed, what area should we focus on next?
-4. Approximately what percentage of the exploration is complete (0-100)?
+この情報に基づいて、以下を評価してください:
+1. さらなる探索が必要か？（true/false）
+2. あなたの理由は？
+3. さらなる探索が必要な場合、次に焦点を当てるべき領域は？
+4. 探索の完了度はおよそ何パーセントか（0-100）？
 
-Respond in the following JSON format:
-```json
-{
-  "deepdive_needed": true/false,
-  "reason": "Your detailed reasoning here",
-  "suggested_focus": "Node ID or area to focus on next",
-  "deepdive_completion_percentage": 0-100
-}
-```
+以下のJSON形式で改行なしに回答してください:
+{"deepdive_needed": true/false, "reason": "あなたの詳細な理由", "suggested_focus": "次に焦点を当てるべき領域", "deepdive_completion_percentage": 0-100}
+
+すべての回答は日本語でお願いします。JSONの形式を厳密に守り、改行を含めないでください。
 """)
 ])
 
@@ -141,40 +138,37 @@ For each estimate, please provide:
 ])
 
 PROPOSAL_REFLECTION_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert at evaluating the completeness of ROI calculations.
-Your job is to determine whether we have sufficient information to finalize our ROI proposal.
+    ("system", """あなたはROI計算の完全性を評価する専門家です。
+あなたの仕事は、ROI提案を最終決定するのに十分な情報があるかどうかを判断することです。
 
-A complete ROI calculation should:
-1. Have estimated values for all major components
-2. Include appropriate confidence levels
-3. Document key assumptions
-4. Consider both costs and benefits
-5. Account for timeframes
+完全なROI計算は以下の特徴を持つべきです:
+1. すべての主要コンポーネントの見積もり値がある
+2. 適切な信頼度レベルが含まれている
+3. 主要な前提条件が文書化されている
+4. コストと利益の両方を考慮している
+5. 時間枠を考慮している
+
+正確な単一行のJSON形式で応答してください。改行を含めないでください。
 """),
     MessagesPlaceholder(variable_name="messages"),
     ("human", """
-Evaluate the current state of our ROI calculation:
+ROI計算の現状を評価してください:
 
-Current ROI Summary:
+現在のROIサマリー:
 {roi_calculation_summary}
 
-Nodes analyzed: {analyzed_nodes_count} of {total_nodes_count}
-Nodes still missing estimates: {missing_estimates_count}
+分析されたノード: {analyzed_nodes_count} / {total_nodes_count}
+まだ見積もりがないノード: {missing_estimates_count}
 
-Based on this information, please assess:
-1. Is the ROI calculation complete enough to finalize our proposal? (true/false)
-2. What's your reasoning?
-3. What information is still missing, if any?
-4. What's your confidence in the overall ROI calculation (0-100%)?
+この情報に基づいて、以下を評価してください:
+1. 提案を最終決定するのにROI計算は十分に完了していますか？（true/false）
+2. あなたの理由は？
+3. まだ不足している情報があれば、何ですか？
+4. 全体的なROI計算の信頼度はどれくらいですか（0-100%）？
 
-Respond in the following JSON format:
-```json
-{
-  "proposal_complete": true/false,
-  "reason": "Your detailed reasoning here",
-  "missing_information": ["Item 1", "Item 2", ...],
-  "roi_confidence": 0-100
-}
-```
+以下のJSON形式で改行なしに回答してください:
+{"proposal_complete": true/false, "reason": "あなたの詳細な理由", "missing_information": ["項目1", "項目2"], "roi_confidence": 0-100}
+
+すべての回答は日本語でお願いします。JSONの形式を厳密に守り、改行を含めないでください。
 """)
 ])
