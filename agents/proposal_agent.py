@@ -11,7 +11,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 from domain.schemas import ProposalState, ROICalculation, ProposalAnalysis
 from domain.roitree import ROINode
-from agents.prompts import PROPOSAL_ANALYSIS_PROMPT, PROPOSAL_REFLECTION_PROMPT, PROPOSAL_SYSTEM_PROMPT
+from domain.reflection import ReflectionManager, TaskReflector, format_reflections
+from agents.prompts import PROPOSAL_SYSTEM_PROMPT, PROPOSAL_REFLECTION_PROMPT
 from utils.parsers import parse_roi_calculation, parse_proposal_reflection
 from utils.visualization import (
     format_tree_for_display,
@@ -19,6 +20,9 @@ from utils.visualization import (
     build_nodes_dictionary,
     format_roi_calculation
 )
+
+# 反省管理の共有インスタンスを使用
+from agents.deepdive_agent import reflection_manager
 
 # Initialize LLM
 model = ChatOpenAI(
@@ -28,6 +32,9 @@ model = ChatOpenAI(
 )
 analysis_model = model
 reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.1)  # Even lower temp for reflection
+
+# タスク反省機能を初期化
+task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
 
 
 # =========================
@@ -207,19 +214,19 @@ def update_node_values(state: ProposalState, calculations: List[ROICalculation])
 
 def propose_solutions(state: ProposalState) -> ProposalState:
     """
-    特定のノードのROIを分析し、ツリーを更新する
+    Analyze ROI for specific nodes and update the tree
     """
-    # 次に分析するノードを見つける
+    # Find the next node to analyze
     next_node_id = state["current_node_id"] or get_next_node_to_analyze(state)
     
     if not next_node_id:
-        # 分析するノードがもうない
+        # No more nodes to analyze
         if "summary" not in state["roi_calculations"]:
-            # 最終ROIを計算
+            # Calculate final ROI
             roi_result = state["root_node"].calculate_roi()
             state["roi_calculations"]["summary"] = roi_result
             
-        # ROIをまとめるメッセージを作成
+        # Create a message summarizing the ROI
         summary = state["roi_calculations"].get("summary", {})
         summary_text = f"""
 分析に基づいて、最終的なROIサマリーは以下のとおりです:
@@ -228,7 +235,7 @@ def propose_solutions(state: ProposalState) -> ProposalState:
 
 主要コンポーネント:
 """
-        # 主要コンポーネントを追加
+        # Add major components
         for child in summary.get('children_values', []):
             summary_text += f"- {child['name']}: ¥{child['weighted_value']*1000:,.0f} (全体の{child['importance_factor']:.1%})\n"
         
@@ -238,14 +245,22 @@ def propose_solutions(state: ProposalState) -> ProposalState:
         
         return state
     
-    # 現在のノードを更新
+    # Update current node
     state["current_node_id"] = next_node_id
     
-    # このノードのコンテキストを取得
+    # Get context for this node
     context = get_node_analysis_context(state, next_node_id)
     
+    # 関連する過去のリフレクションを取得
+    relevant_reflections = reflection_manager.get_relevant_reflections(
+        f"{context['current_node_name']} ROI計算"
+    )
+    reflection_text = format_reflections(relevant_reflections)
+    
     # 明示的に日本語で応答するよう指示を追加
-    system_message = SystemMessage(content=PROPOSAL_SYSTEM_PROMPT + "\n\n特に重要: すべての応答は必ず日本語で行ってください。")
+    system_message = SystemMessage(content=PROPOSAL_SYSTEM_PROMPT + 
+        f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
+        "特に重要: すべての応答は必ず日本語で行ってください。")
     
     messages = state["messages"] + [
         HumanMessage(content=f"""
@@ -268,6 +283,8 @@ ROIツリー全体におけるコンテキスト:
 2. 信頼度レベル（0-100%）
 3. 見積もりの背後にある主要な前提条件
 4. 時間的考慮（一回限りか継続的か、いつ利益が実現されるか）
+
+過去のリフレクションに基づいた改善点も考慮してください。
 
 必ず日本語で回答してください。
 """)
@@ -293,6 +310,21 @@ ROIツリー全体におけるコンテキスト:
         
         # ツリーのROI値を更新
         state = update_node_values(state, calculations)
+    
+    # タスクと結果に対する反省を実行
+    task_context = {
+        "node_name": context["current_node_name"],
+        "node_details": context["current_node_details"],
+        "node_importance": context["current_node_importance"],
+        "calculation_result": calculations[0].estimated_value if calculations else None,
+        "confidence": calculations[0].confidence if calculations else None
+    }
+    
+    task_reflector.run(
+        task=f"ROIノード「{context['current_node_name']}」の価値見積もり",
+        result=response.content,
+        context=task_context
+    )
     
     return state
 
@@ -320,6 +352,10 @@ def self_reflect_proposal(state: ProposalState) -> ProposalState:
         summary = state["roi_calculations"]["summary"]
         roi_summary = format_roi_calculation(summary)
     
+    # 関連する過去のリフレクションを取得
+    relevant_reflections = reflection_manager.get_relevant_reflections("ROI提案の完了判断")
+    reflection_context = format_reflections(relevant_reflections)
+    
     # 反省プロンプトを生成
     reflection_input = PROPOSAL_REFLECTION_PROMPT.format(
         messages=state["messages"][-5:],  # コンテキストには最近のメッセージのみ使用
@@ -331,7 +367,28 @@ def self_reflect_proposal(state: ProposalState) -> ProposalState:
     
     try:
         # LLMから反省を取得
-        reflection_response = reflection_model.invoke(reflection_input)
+        reflection_system_message = SystemMessage(content=f"""あなたはROI計算の完全性を評価する専門家です。
+あなたの仕事は、ROI提案を最終決定するのに十分な情報があるかどうかを判断することです。
+
+完全なROI計算は以下の特徴を持つべきです:
+1. すべての主要コンポーネントの見積もり値がある
+2. 適切な信頼度レベルが含まれている
+3. 主要な前提条件が文書化されている
+4. コストと利益の両方を考慮している
+5. 時間枠を考慮している
+
+以下の過去のリフレクションも考慮してください:
+{reflection_context}
+
+正確な単一行のJSON形式で応答してください。改行を含めないでください。
+""")
+        
+        reflection_messages = [
+            reflection_system_message,
+            HumanMessage(content=reflection_input)
+        ]
+        
+        reflection_response = reflection_model.invoke(reflection_messages)
         
         # 反省を解析
         success, analysis = parse_proposal_reflection(reflection_response)
@@ -339,6 +396,19 @@ def self_reflect_proposal(state: ProposalState) -> ProposalState:
         if success and analysis:
             state["self_reflection"] = analysis
             state["proposal_complete"] = analysis.proposal_complete
+            
+            # リフレクション結果を記録
+            task_reflector.run(
+                task="ROI提案の完了判断",
+                result=f"完了: {analysis.proposal_complete}, 信頼度: {analysis.roi_confidence}, 理由: {analysis.reason}",
+                context={
+                    "analyzed_nodes": analyzed_nodes_count,
+                    "total_nodes": total_nodes,
+                    "missing_estimates_count": missing_estimates_count,
+                    "roi_confidence": analysis.roi_confidence,
+                    "missing_information": analysis.missing_information
+                }
+            )
         else:
             # 解析に失敗した場合のフォールバック
             state["iteration_count"] += 1

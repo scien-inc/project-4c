@@ -5,6 +5,7 @@ import os
 import streamlit as st
 from typing import Dict, List, Any, Optional
 import json
+import pandas as pd
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.callbacks.base import BaseCallbackHandler
@@ -15,13 +16,11 @@ os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 # プロジェクト名を設定（オプション）
 os.environ["LANGCHAIN_PROJECT"] = "roi_tree_explorer"
 
-from langchain.callbacks import get_openai_callback
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain.callbacks.base import BaseCallbackHandler
 
 from agents.deepdive_agent import build_deepdive_graph, init_deepdive_state
 from agents.proposal_agent import build_proposal_graph, init_proposal_state
 from domain.roitree import ROINode, create_default_roi_tree
+from domain.reflection import ReflectionManager
 from utils.visualization import format_tree_for_display, generate_mermaid_diagram, format_roi_calculation
 from dotenv import load_dotenv
 
@@ -214,11 +213,122 @@ def main():
             st.rerun()
     
     # タブを作成
-    tab_deepdive, tab_proposal = st.tabs(["課題深掘りエージェント", "提案エージェント"])
+    tab_deepdive, tab_proposal, tab_reflections = st.tabs(["課題深掘りエージェント", "提案エージェント", "反省データベース"])
     
     # =========================
-    # 課題深掘りエージェントタブ
+    # 反省データベースタブ
     # =========================
+    with tab_reflections:
+        st.header("反省データベース")
+        st.markdown("""
+        このタブでは、エージェントが過去のタスク実行から学んだ反省データを確認できます。
+        これらの反省は、将来のタスク実行の質を向上させるために使用されます。
+        """)
+        reflection_manager = ReflectionManager()
+        
+        # すべての反省を取得
+        all_reflections = reflection_manager.get_all_reflections()
+        
+        if not all_reflections:
+            st.info("まだ反省データはありません。エージェントを使用してデータを生成してください。")
+        else:
+            # 反省を日付でソート
+            all_reflections.sort(key=lambda r: r.timestamp, reverse=True)
+            
+            # 反省データをテーブル表示用に変換
+            reflection_data = []
+            for reflection in all_reflections:
+                reflection_data.append({
+                    "ID": reflection.id,
+                    "タイムスタンプ": reflection.timestamp,
+                    "タスク": reflection.task,
+                    "判断": reflection.judgment.result,
+                    "再試行": "必要" if reflection.judgment.needs_retry else "不要",
+                    "タグ": ", ".join(reflection.tags)
+                })
+            
+            st.subheader("反省リスト")
+            reflection_df = pd.DataFrame(reflection_data)
+            st.dataframe(reflection_df, use_container_width=True)
+            
+            # 詳細表示
+            st.subheader("反省詳細")
+            selected_reflection_id = st.selectbox(
+                "詳細を表示する反省を選択",
+                options=[r.id for r in all_reflections],
+                format_func=lambda id: next((r.task for r in all_reflections if r.id == id), id)
+            )
+            
+            if selected_reflection_id:
+                selected_reflection = reflection_manager.get_reflection(selected_reflection_id)
+                if selected_reflection:
+                    # 反省の詳細を表示
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"**タスク:**")
+                        st.info(selected_reflection.task)
+                        
+                        st.markdown(f"**コンテキスト:**")
+                        st.json(selected_reflection.context)
+                        
+                        st.markdown(f"**判断:**")
+                        st.success(f"{selected_reflection.judgment.result}: {selected_reflection.judgment.reason}")
+                        
+                        if selected_reflection.judgment.suggested_approach:
+                            st.markdown(f"**推奨アプローチ:**")
+                            st.warning(selected_reflection.judgment.suggested_approach)
+                    
+                    with col2:
+                        st.markdown(f"**結果:**")
+                        st.info(selected_reflection.result[:500] + "..." if len(selected_reflection.result) > 500 else selected_reflection.result)
+                        
+                        st.markdown(f"**反省:**")
+                        st.info(selected_reflection.reflection[:500] + "..." if len(selected_reflection.reflection) > 500 else selected_reflection.reflection)
+            
+            # 反省の活用状況
+            st.subheader("反省の活用状況")
+            st.markdown("""
+            これらの反省データは、次のように活用されています：
+            
+            1. 新しいタスクを実行する際に、関連する過去の反省が検索されます
+            2. 過去の反省に基づいて、タスクの進め方が改善されます
+            3. 同様の課題が発生した場合に、より効率的な解決策が提案されます
+            """)
+            
+            # タグベースのフィルタリング
+            unique_tags = set()
+            for reflection in all_reflections:
+                unique_tags.update(reflection.tags)
+            
+            if unique_tags:
+                st.subheader("タグでフィルタリング")
+                selected_tag = st.selectbox(
+                    "タグを選択",
+                    options=["すべて表示"] + sorted(list(unique_tags))
+                )
+                
+                if selected_tag != "すべて表示":
+                    filtered_reflections = [r for r in all_reflections if selected_tag in r.tags]
+                    
+                    if filtered_reflections:
+                        # フィルタリングされた反省データをテーブル表示用に変換
+                        filtered_data = []
+                        for reflection in filtered_reflections:
+                            filtered_data.append({
+                                "ID": reflection.id,
+                                "タイムスタンプ": reflection.timestamp,
+                                "タスク": reflection.task,
+                                "判断": reflection.judgment.result,
+                                "再試行": "必要" if reflection.judgment.needs_retry else "不要"
+                            })
+                        
+                        st.dataframe(pd.DataFrame(filtered_data), use_container_width=True)
+                    else:
+                        st.info(f"タグ '{selected_tag}' を持つ反省データはありません。")
+    
+    
+    # 既存のタブコードを続ける...
     with tab_deepdive:
         st.header("課題深掘りエージェント - ROIツリー探索")
         st.markdown("""

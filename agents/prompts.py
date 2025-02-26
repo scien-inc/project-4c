@@ -79,7 +79,7 @@ ROIツリー探索の現状を評価してください:
 4. 探索の完了度はおよそ何パーセントか（0-100）？
 
 以下のJSON形式で改行なしに回答してください:
-{"deepdive_needed": true/false, "reason": "あなたの詳細な理由", "suggested_focus": "次に焦点を当てるべき領域", "deepdive_completion_percentage": 0-100}
+{{"deepdive_needed": true/false, "reason": "あなたの詳細な理由", "suggested_focus": "次に焦点を当てるべき領域", "deepdive_completion_percentage": 0-100}}
 
 すべての回答は日本語でお願いします。JSONの形式を厳密に守り、改行を含めないでください。
 """)

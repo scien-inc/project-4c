@@ -11,7 +11,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 from domain.schemas import DeepdiveState, ROINodeUpdate, ROIAnalysis, NodePath
 from domain.roitree import ROINode, create_default_roi_tree
-from agents.prompts import DEEPDIVE_EXPLORATION_PROMPT, DEEPDIVE_REFLECTION_PROMPT, DEEPDIVE_SYSTEM_PROMPT
+from domain.reflection import ReflectionManager, TaskReflector, format_reflections
+from agents.prompts import DEEPDIVE_SYSTEM_PROMPT, DEEPDIVE_REFLECTION_PROMPT
 from utils.parsers import parse_roi_node_update, parse_reflection_analysis
 from utils.visualization import (
     format_tree_for_display, 
@@ -21,14 +22,20 @@ from utils.visualization import (
     get_tree_statistics
 )
 
+# 反省管理とタスク反省機能を初期化
+reflection_manager = ReflectionManager()
+
 # Initialize LLM
 model = ChatOpenAI(
     model="gpt-4o",
-    temperature=0.2,  # Lower temperature for more consistent, focused responses
+    temperature=0.3,  # Lower temperature for more consistent, focused responses
     streaming=True    # Enable streaming for real-time output
 )
 exploration_model = model
-reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.1)  # Even lower temp for reflection
+reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.3)  # Even lower temp for reflection
+
+# タスク反省機能を初期化
+task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
 
 
 # =========================
@@ -174,9 +181,17 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
     # プロンプト用のツリーコンテキストを取得
     tree_context = get_tree_context(state)
     
+    # 関連する過去のリフレクションを取得
+    relevant_reflections = reflection_manager.get_relevant_reflections(
+        f"{current_node_name} {current_node_details}"
+    )
+    reflection_text = format_reflections(relevant_reflections)
+    
     # 探索プロンプトを使用して応答を生成
     # 明示的に日本語で応答するよう指示を追加
-    system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + "\n\n特に重要: すべての応答は必ず日本語で行ってください。")
+    system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + 
+        f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
+        "特に重要: すべての応答は必ず日本語で行ってください。")
     
     messages = state["messages"] + [
         HumanMessage(content=f"""
@@ -189,6 +204,8 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
 このROIツリーの側面をさらに探索するのを手伝ってください。サブコンポーネントを特定するための的を絞った質問をするか、適切な場合は新しいブランチを提案してください。
 
 重要度係数について考えることを忘れないでください - 各サブコンポーネントは兄弟コンポーネントと比較してどの程度重要ですか？重要度係数は兄弟間で合計100%になるようにしてください。
+
+過去のリフレクションに基づいた改善点も考慮してください。
 
 必ず日本語で回答してください。
 """)
@@ -208,6 +225,19 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
     if updates:
         # ROIツリーに更新を適用
         state, update_descriptions = update_roi_tree(state, updates)
+    
+    # タスクと結果に対する反省を実行
+    context = {
+        "node_name": current_node_name,
+        "node_details": current_node_details,
+        "tree_context": tree_context,
+    }
+    
+    task_reflector.run(
+        task=f"ROIツリーノード「{current_node_name}」の探索",
+        result=response.content,
+        context=context
+    )
     
     return state
 
@@ -231,6 +261,10 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
         if node_id in nodes_dict:
             exploration_history.append(nodes_dict[node_id].name)
     
+    # 関連する過去のリフレクションを取得
+    relevant_reflections = reflection_manager.get_relevant_reflections("ROIツリー探索の完了判断")
+    reflection_context = format_reflections(relevant_reflections)
+    
     # 反省プロンプトを生成
     reflection_input = DEEPDIVE_REFLECTION_PROMPT.format(
         messages=state["messages"][-5:],  # コンテキストには最近のメッセージのみ使用
@@ -244,7 +278,27 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
     
     try:
         # LLMから反省を取得
-        reflection_response = reflection_model.invoke(reflection_input)
+        reflection_system_message = SystemMessage(content=f"""あなたはROIツリー分析の完全性を評価する専門家です。
+あなたの仕事はROIツリーのブランチが十分に探索されたかどうかを判断することです。
+
+十分に探索されたブランチは以下の特徴を持つべきです:
+1. 適切な深さ（通常3〜4レベル）
+2. 葉ノードに具体的で測定可能な要素を含む
+3. カテゴリの主要コンポーネントをカバーしている
+4. 兄弟間で合理的な重要度係数が割り当てられている
+
+以下の過去のリフレクションも考慮してください:
+{reflection_context}
+
+正確な単一行のJSON形式で応答してください。改行を含めないでください。
+""")
+        
+        reflection_messages = [
+            reflection_system_message,
+            HumanMessage(content=reflection_input)
+        ]
+        
+        reflection_response = reflection_model.invoke(reflection_messages)
         
         # 反省を解析
         success, analysis = parse_reflection_analysis(reflection_response)
@@ -263,6 +317,17 @@ def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
                         # このノードへのパスを再構築（簡易化）
                         state["node_path"] = [state["root_node"].node_id, node_id]
                         break
+            
+            # リフレクション結果を記録
+            task_reflector.run(
+                task="ROIツリー探索の完了判断",
+                result=f"探索完了度: {analysis.deepdive_completion_percentage}%, 理由: {analysis.reason}",
+                context={
+                    "tree_stats": tree_stats,
+                    "needs_further_exploration": analysis.deepdive_needed,
+                    "suggested_focus": analysis.suggested_focus
+                }
+            )
         else:
             # 解析に失敗した場合のフォールバック
             state["iteration_count"] += 1
