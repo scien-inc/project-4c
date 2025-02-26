@@ -167,7 +167,7 @@ ROI計算の現状を評価してください:
 4. 全体的なROI計算の信頼度はどれくらいですか（0-100%）？
 
 以下のJSON形式で改行なしに回答してください:
-{"proposal_complete": true/false, "reason": "あなたの詳細な理由", "missing_information": ["項目1", "項目2"], "roi_confidence": 0-100}
+{{"proposal_complete": true/false, "reason": "あなたの詳細な理由", "missing_information": ["項目1", "項目2"], "roi_confidence": 0-100}}
 
 すべての回答は日本語でお願いします。JSONの形式を厳密に守り、改行を含めないでください。
 """)

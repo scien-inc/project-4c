@@ -515,7 +515,7 @@ def main():
                     stream_handler = StreamHandler(stream_container)
                     
                     try:
-                        self_reflect_proposal = reflection_manager.get_reflection()
+                        self_reflect_proposal = reflection_manager.get_all_reflections()
                         # 最初に入力されたメッセージに基づく応答を生成
                         new_state = run_one_step(proposal_graph, state, stream_handler)
                         

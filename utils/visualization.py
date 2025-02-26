@@ -4,6 +4,40 @@ Utilities for visualizing ROI trees and calculations
 from typing import Any, Dict, List, Optional
 import textwrap
 
+def generate_mermaid_html(node: Any) -> str:
+    """
+    ROIツリーのMermaidダイアグラムをHTMLとして生成
+    
+    Args:
+        node: ROIツリーのルート
+        
+    Returns:
+        Mermaid.jsを使用したHTML文字列
+    """
+    mermaid_code = node.get_full_mermaid()
+    
+    # エスケープされたコード用のプレースホルダー
+    mermaid_placeholder = "MERMAID_CODE_PLACEHOLDER"
+    
+    html = f"""
+    <div class="mermaid-container">
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>
+            mermaid.initialize({{
+                startOnLoad: true,
+                theme: 'default',
+                flowchart: {{ htmlLabels: true }},
+                securityLevel: 'loose'
+            }});
+        </script>
+        <div class="mermaid">
+            {mermaid_placeholder}
+        </div>
+    </div>
+    """
+    
+    # プレースホルダーを実際のコードに置き換え（エスケープの問題を回避）
+    return html.replace(mermaid_placeholder, mermaid_code)
 
 def format_tree_for_display(node: Any, indent: int = 0, show_details: bool = True) -> str:
     """
@@ -173,3 +207,5 @@ def get_tree_statistics(root_node: Any) -> Dict[str, Any]:
     
     _traverse(root_node)
     return stats
+
+
