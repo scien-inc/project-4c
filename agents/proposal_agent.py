@@ -26,12 +26,12 @@ from agents.deepdive_agent import reflection_manager
 
 # LLMの初期化
 model = ChatOpenAI(
-    model="gpt-4",
+    model="gpt-4o",
     temperature=0.2,  # 一貫性の高い応答のための低い温度
     streaming=True    # リアルタイム出力のためのストリーミング
 )
 analysis_model = model
-reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # 反省にはさらに低い温度
+reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.1)  # 反省にはさらに低い温度
 
 # タスク反省機能を初期化
 task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
