@@ -16,11 +16,11 @@ os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 # プロジェクト名を設定（オプション）
 os.environ["LANGCHAIN_PROJECT"] = "roi_tree_explorer"
 
-
 from agents.deepdive_agent import build_deepdive_graph, init_deepdive_state
 from agents.proposal_agent import build_proposal_graph, init_proposal_state
 from domain.roitree import ROINode, create_default_roi_tree
 from domain.reflection import ReflectionManager
+from domain.schemas import DeepdiveState, ProposalState
 from utils.visualization import format_tree_for_display, generate_mermaid_diagram, format_roi_calculation
 from dotenv import load_dotenv
 
@@ -225,7 +225,6 @@ def main():
         これらの反省は、将来のタスク実行の質を向上させるために使用されます。
         """)
         reflection_manager = ReflectionManager()
-        
         # すべての反省を取得
         all_reflections = reflection_manager.get_all_reflections()
         
@@ -508,7 +507,7 @@ def main():
                 state["messages"].append(HumanMessage(content=user_input))
                 st.session_state[PROPOSAL_STATE_KEY] = state
                     
-                    # グラフを作成
+                    # セルフリフレクション実行（ステータス判定のみ）
                 proposal_graph = build_proposal_graph()
                     
                 with get_openai_callback() as cb:
@@ -516,10 +515,19 @@ def main():
                     stream_handler = StreamHandler(stream_container)
                     
                     try:
-                        # エージェントの応答を追加
+                        self_reflect_proposal = reflection_manager.get_reflection()
+                        # 最初に入力されたメッセージに基づく応答を生成
                         new_state = run_one_step(proposal_graph, state, stream_handler)
                         
-                        # 最新の状態をセッションに保存
+                        # 直後にセルフリフレクションを実行（裏側で実行）
+                        reflection_state = new_state.copy()
+                        reflection_state = self_reflect_proposal(reflection_state)
+                        
+                        # 会話終了判定だけをオリジナル状態に反映
+                        new_state["self_reflection"] = reflection_state["self_reflection"]
+                        new_state["proposal_complete"] = reflection_state["proposal_complete"]
+                        
+                        # 状態を更新
                         st.session_state[PROPOSAL_STATE_KEY] = new_state
                         
                         # トークン使用量を表示
@@ -531,7 +539,7 @@ def main():
                                 reason = new_state["self_reflection"].reason
                                 st.success(f"提案完了！理由: {reason}")
                             else:
-                                st.success("提案完了！")
+                                st.success("提案完了！セルフリフレクションは裏で実行されており会話は終了できます。")
                         
                         # UIを更新するためにページを再読み込み
                         st.rerun()

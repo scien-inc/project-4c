@@ -26,12 +26,12 @@ from agents.deepdive_agent import reflection_manager
 
 # Initialize LLM
 model = ChatOpenAI(
-    model="gpt-4o",
+    model="gpt-4",
     temperature=0.2,  # Lower temperature for more consistent, focused responses
     streaming=True    # Enable streaming for real-time output
 )
 analysis_model = model
-reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.1)  # Even lower temp for reflection
+reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # Even lower temp for reflection
 
 # タスク反省機能を初期化
 task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
@@ -214,9 +214,9 @@ def update_node_values(state: ProposalState, calculations: List[ROICalculation])
 
 def propose_solutions(state: ProposalState) -> ProposalState:
     """
-    Analyze ROI for specific nodes and update the tree
+    ユーザーの入力に基づいてノードのROIを分析（自動会話生成なし）
     """
-    # Find the next node to analyze
+    # 次に分析するノードを見つける
     next_node_id = state["current_node_id"] or get_next_node_to_analyze(state)
     
     if not next_node_id:
@@ -257,13 +257,31 @@ def propose_solutions(state: ProposalState) -> ProposalState:
     )
     reflection_text = format_reflections(relevant_reflections)
     
-    # 明示的に日本語で応答するよう指示を追加
-    system_message = SystemMessage(content=PROPOSAL_SYSTEM_PROMPT + 
-        f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
-        "特に重要: すべての応答は必ず日本語で行ってください。")
+    # 最新のユーザーメッセージを取得
+    latest_user_message = None
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            latest_user_message = msg.content
+            break
     
-    messages = state["messages"] + [
-        HumanMessage(content=f"""
+    if not latest_user_message:
+        # 初回の場合や、ユーザーメッセージがない場合はデフォルトの応答を返す
+        response_content = f"""
+現在、「{context['current_node_name']}」ノードのROI分析を行っています。
+重要度係数: {context['current_node_importance']}
+
+このノードについて、価値見積もりに必要な情報をお聞かせください。
+例えば、予想される効果の大きさや、実現可能性などについて教えていただけると助かります。
+        """
+        response = AIMessage(content=response_content)
+    else:
+        # システムメッセージを設定
+        system_message = SystemMessage(content=PROPOSAL_SYSTEM_PROMPT + 
+            f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
+            "特に重要: すべての応答は必ず日本語で行ってください。")
+        
+        messages = state["messages"][-5:] + [
+            HumanMessage(content=f"""
 ROIツリーの以下のノードについてROIを推定しましょう:
 
 ノード: {context["current_node_name"]}
@@ -276,9 +294,11 @@ ROIツリーの以下のノードについてROIを推定しましょう:
 ROIツリー全体におけるコンテキスト:
 {context["node_context"]}
 
-このコンポーネントの潜在的価値を見積もるのを手伝ってください。十分な情報に基づいた見積もりをするために必要な質問をするか、利用可能な情報に基づいて推奨事項を提供してください。
+ユーザーからの質問/入力: {latest_user_message}
 
-各見積もりについて、以下を提供してください:
+このノードに関するユーザーの質問に回答するか、より詳細な情報を求めてください。
+
+各見積もりについて、以下の情報を収集することを目指してください:
 1. 見積もり価値（金銭的な観点で）
 2. 信頼度レベル（0-100%）
 3. 見積もりの背後にある主要な前提条件
@@ -288,15 +308,11 @@ ROIツリー全体におけるコンテキスト:
 
 必ず日本語で回答してください。
 """)
-    ]
+        ]
+        
+        response = analysis_model.invoke([system_message] + messages)
     
-    # このノードの分析を生成
-    response = analysis_model.invoke([system_message] + messages)
-    
-    # メッセージを更新
-    state["messages"].append(
-        HumanMessage(content=f"「{context['current_node_name']}」のROIを分析しましょう。")
-    )
+    # 応答をメッセージリストに追加（ユーザーメッセージは既に追加されているはず）
     state["messages"].append(response)
     
     # 応答を解析してROI計算を抽出

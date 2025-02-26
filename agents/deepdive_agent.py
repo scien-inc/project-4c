@@ -27,12 +27,12 @@ reflection_manager = ReflectionManager()
 
 # Initialize LLM
 model = ChatOpenAI(
-    model="gpt-4o",
-    temperature=0.3,  # Lower temperature for more consistent, focused responses
+    model="gpt-4",
+    temperature=0.2,  # Lower temperature for more consistent, focused responses
     streaming=True    # Enable streaming for real-time output
 )
 exploration_model = model
-reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.3)  # Even lower temp for reflection
+reflection_model = ChatOpenAI(model="gpt-4", temperature=0.1)  # Even lower temp for reflection
 
 # タスク反省機能を初期化
 task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
@@ -165,7 +165,7 @@ def update_roi_tree(
 
 def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
     """
-    ユーザーと対話し、ROIツリー探索を行う
+    ユーザーの入力に基づいてROIツリー探索を行う（自動会話生成なし）
     """
     # 現在のノード情報を取得
     current_node = None
@@ -187,21 +187,39 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
     )
     reflection_text = format_reflections(relevant_reflections)
     
-    # 探索プロンプトを使用して応答を生成
-    # 明示的に日本語で応答するよう指示を追加
-    system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + 
-        f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
-        "特に重要: すべての応答は必ず日本語で行ってください。")
+    # 最新のユーザーメッセージを取得
+    latest_user_message = None
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            latest_user_message = msg.content
+            break
     
-    messages = state["messages"] + [
-        HumanMessage(content=f"""
+    if not latest_user_message:
+        # 初回の場合や、ユーザーメッセージがない場合はデフォルトの応答を返す
+        response_content = f"""
+ROIツリーへようこそ！現在、「{current_node_name}」ノードに焦点を当てています。
+このROIツリーは「コスト削減」と「売上増加」の観点から、ビジネス機会を分析するために使用されます。
+
+具体的な質問や、さらに深掘りしたい領域について教えてください。
+        """
+        response = AIMessage(content=response_content)
+    else:
+        # 探索プロンプトを使用して応答を生成
+        system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + 
+            f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
+            "特に重要: すべての応答は必ず日本語で行ってください。")
+        
+        messages = state["messages"][-5:] + [
+            HumanMessage(content=f"""
 現在のROIツリーコンテキスト:
 {tree_context}
 
 現在のフォーカス: {current_node_name}
 説明: {current_node_details}
 
-このROIツリーの側面をさらに探索するのを手伝ってください。サブコンポーネントを特定するための的を絞った質問をするか、適切な場合は新しいブランチを提案してください。
+ユーザーからの質問/入力: {latest_user_message}
+
+ROIツリーについての対話を続けてください。質問に回答するか、ROIツリーのさらなる展開についてアドバイスしてください。
 
 重要度係数について考えることを忘れないでください - 各サブコンポーネントは兄弟コンポーネントと比較してどの程度重要ですか？重要度係数は兄弟間で合計100%になるようにしてください。
 
@@ -209,14 +227,11 @@ def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
 
 必ず日本語で回答してください。
 """)
-    ]
+        ]
+        
+        response = exploration_model.invoke([system_message] + messages)
     
-    response = exploration_model.invoke([system_message] + messages)
-    
-    # メッセージを更新
-    state["messages"].append(
-        HumanMessage(content=f"「{current_node_name}」についてさらに詳しく教えてください。")
-    )
+    # 応答をメッセージリストに追加（ユーザーメッセージは既に追加されているはず）
     state["messages"].append(response)
     
     # 応答を解析してノード更新を抽出
