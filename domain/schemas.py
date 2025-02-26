@@ -1,44 +1,89 @@
-# roi_agents/domain/schemas.py
+"""
+State schemas for the ROI agents
+"""
+from typing import TypedDict, List, Dict, Any, Literal, Optional, Union
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, FunctionMessage
+from pydantic import BaseModel, Field
 
-from typing import TypedDict, List, Dict, Any, Literal, Optional
-from langchain.schema import BaseMessage, HumanMessage, AIMessage  # langchain_coreでなく langchain.schema を想定
-from domain.roitree import ROINode
+# Type definition for node path (to track position in tree)
+NodePath = List[str]
 
 # =========================
-# 課題エージェント用のステート
+# Pydantic models for better type safety
 # =========================
-class DeepdiveState(TypedDict):
-    # 対話履歴（シンプルにBaseMessage継承クラスを格納）
-    messages: List[BaseMessage]
 
-    # ROIノードのルート（例えば "Gain" ノードを頂点に持つツリーを想定）
-    root_node: Optional[ROINode]
+class ROINodeUpdate(BaseModel):
+    """Represents a parsed update to the ROI tree"""
+    parent_node_id: Optional[str] = None
+    name: str
+    details: Optional[str] = None
+    importance_factor: float = 1.0
+    value: Optional[float] = None
+    
 
-    # 現在のノード: ユーザと対話中のノード(どこを深掘りしているか)
-    current_node: Optional[ROINode]
-
-    # フラグ類
-    iteration_count: int
-    max_iterations: int
-    # 「まだ深掘りが必要か」or「十分に深掘りできたか」をセルフリフレクションで判断
+class ROIAnalysis(BaseModel):
+    """Self-reflection analysis of the ROI tree exploration progress"""
     deepdive_needed: bool
+    reason: str
+    suggested_focus: Optional[str] = None
+    deepdive_completion_percentage: float = Field(..., ge=0, le=100)
+    
+
+class ROICalculation(BaseModel):
+    """ROI calculation for a proposal"""
+    node_id: str
+    name: str  
+    estimated_value: float
+    confidence: float = Field(..., ge=0, le=1)
+    assumptions: List[str] = []
+    
+
+class ProposalAnalysis(BaseModel):
+    """Self-reflection analysis of the proposal generation process"""
+    proposal_complete: bool
+    reason: str
+    missing_information: List[str] = []
+    roi_confidence: float = Field(..., ge=0, le=1)
 
 
 # =========================
-# 提案エージェント用のステート
+# State type definitions
 # =========================
-class ProposalState(TypedDict):
-    # 対話履歴
-    messages: List[BaseMessage]
 
-    # 課題側で構築されたROIツリーを参照（read only）
-    root_node: ROINode
-
-    # 提案内容や試算結果を保持
-    roi_calculations: Dict[str, Any]
-
-    # フラグ類
+class DeepdiveState(TypedDict):
+    # Messages and conversation history
+    messages: List[Union[HumanMessage, AIMessage, SystemMessage, FunctionMessage]]
+    
+    # ROI tree data
+    root_node: Any  # ROINode object (typed as Any to avoid circular imports)
+    current_node_id: Optional[str]  # ID of the node being explored
+    
+    # Path tracking for navigation
+    node_path: NodePath
+    
+    # Analysis and control flags
+    exploration_history: List[str]  # IDs of nodes already explored
     iteration_count: int
     max_iterations: int
-    # 「ROIが最終的に算出できたか？」セルフリフレクションで判断
+    min_nodes_per_branch: int  # Minimum depth to explore
+    self_reflection: Optional[ROIAnalysis]  # Last self-reflection result
+    exploration_complete: bool
+
+
+class ProposalState(TypedDict):
+    # Messages and conversation history
+    messages: List[Union[HumanMessage, AIMessage, SystemMessage, FunctionMessage]]
+    
+    # Reference to the ROI tree (readonly)
+    root_node: Any  # ROINode object
+    
+    # ROI calculation results
+    roi_calculations: Dict[str, Any]
+    current_node_id: Optional[str]  # ID of the node being analyzed
+    
+    # Analysis and control flags
+    analyzed_nodes: List[str]  # IDs of nodes already analyzed
+    iteration_count: int
+    max_iterations: int
+    self_reflection: Optional[ProposalAnalysis]
     proposal_complete: bool
