@@ -7,6 +7,10 @@ from typing import Dict, List, Any, Optional
 import json
 import pandas as pd
 import streamlit.components.v1 as components
+from dotenv import load_dotenv
+
+# 環境変数を読み込み（最初に行う）
+load_dotenv()
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.callbacks.base import BaseCallbackHandler
@@ -28,10 +32,6 @@ from utils.visualization import (
     format_roi_calculation, 
     generate_mermaid_html
 )
-from dotenv import load_dotenv
-
-# 環境変数を読み込み
-load_dotenv()
 
 # 定数
 DEEPDIVE_STATE_KEY = "deepdive_state"

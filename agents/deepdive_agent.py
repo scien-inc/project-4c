@@ -3,7 +3,10 @@ Deepdive Agent for ROI tree exploration
 """
 import os
 from typing import Literal, Dict, List, Any, Optional, Tuple, cast
+from dotenv import load_dotenv
 
+# 環境変数を読み込み（最初に行う）
+load_dotenv()
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
