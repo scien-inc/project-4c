@@ -8,7 +8,7 @@ import json
 import pandas as pd
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
-
+from pyngrok import ngrok
 # 環境変数を読み込み（最初に行う）
 load_dotenv()
 
@@ -602,4 +602,13 @@ def main():
 
 # アプリを実行
 if __name__ == "__main__":
+    try:
+        # 新しいバージョンでは接続方法が変更されています
+        # addr引数を使用して接続先を指定します
+        public_url = ngrok.connect(addr="8501", proto="http")
+        print(f" * ngrok tunnel opened at {public_url}")
+        print(f" * Open this URL to access your Streamlit app from anywhere")
+    except Exception as e:
+        print(f"ngrok接続エラー: {str(e)}")
+        print("通常のStreamlitアプリとして実行を継続します...")
     main()
