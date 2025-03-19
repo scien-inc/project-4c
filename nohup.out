@@ -1,0 +1,41 @@
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://192.168.11.36:8501
+
+t=2025-03-02T15:54:47+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=5e93125a0da52a7e err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:54:50+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=a7eac135652c1e1e err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:54:53+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=a7a36d1ee3608101 err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:55:31+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=253136a442d4b28c err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:55:35+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=2fd4d1b63ebe2f8c err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:55:36+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=71d6c03d8f69291b err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"
+t=2025-03-02T15:55:36+0900 lvl=warn msg="failed to start tunnel" pg=/api/tunnels id=aa8a1028a820bda7 err="failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX, tn_2tkaMWLzps0Ep2bKJKrrC2lPi6g\n\r\n\r\nERR_NGROK_324\r\n"
+ * ngrok tunnel opened at NgrokTunnel: "https://c07e-126-65-160-123.ngrok-free.app" -> "http://localhost:8501"
+ * Open this URL to access your Streamlit app from anywhere
+ * ngrok tunnel opened at NgrokTunnel: "https://19b9-126-65-160-123.ngrok-free.app" -> "http://localhost:8501"
+ * Open this URL to access your Streamlit app from anywhere
+ * ngrok tunnel opened at NgrokTunnel: "https://bbec-126-65-160-123.ngrok-free.app" -> "http://localhost:8501"
+ * Open this URL to access your Streamlit app from anywhere
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaMWLzps0Ep2bKJKrrC2lPi6g, tn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+ngrok接続エラー: ngrok client exception, API returned 502: {"error_code":103,"status_code":502,"msg":"failed to start tunnel","details":{"err":"failed to start tunnel: Your account may not run more than 3 tunnels over a single ngrok agent session.\nThe tunnels already running on this session are:\ntn_2tkaNFEIFLrY8MYvU0BlYIAIwPB, tn_2tkaNgCwC9VE2thThvdY203dCYX, tn_2tkaMWLzps0Ep2bKJKrrC2lPi6g\n\r\n\r\nERR_NGROK_324\r\n"}}
+
+通常のStreamlitアプリとして実行を継続します...
+  Stopping...

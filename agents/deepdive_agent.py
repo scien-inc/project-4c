@@ -1,409 +1,217 @@
 """
-Deepdive Agent for ROI tree exploration
+Simplified Challenge Agent for ROI tree exploration
 """
-import os
-from typing import Literal, Dict, List, Any, Optional, Tuple, cast
-from dotenv import load_dotenv
+from typing import Dict, List, Tuple, Optional, Any
+import json
+import re
 
-# 環境変数を読み込み（最初に行う）
-load_dotenv()
-from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 
-from domain.schemas import DeepdiveState, ROINodeUpdate, ROIAnalysis, NodePath
-from domain.roitree import ROINode, create_default_roi_tree
-from domain.reflection import ReflectionManager, TaskReflector, format_reflections
-from agents.prompts import DEEPDIVE_SYSTEM_PROMPT, DEEPDIVE_REFLECTION_PROMPT
-from utils.parsers import parse_roi_node_update, parse_reflection_analysis
-from utils.visualization import (
-    format_tree_for_display, 
-    get_node_path_string,
-    generate_mermaid_diagram,
-    build_nodes_dictionary,
-    get_tree_statistics
-)
-
-# 反省管理とタスク反省機能を初期化
-# 自動リセット機能はStreamlitのセッションからmain.pyで設定される
-reflection_manager = ReflectionManager()
-
-# LLMの初期化
-model = ChatOpenAI(
-    model="gpt-4o",
-    temperature=0.2,  # 一貫性の高い応答のための低い温度
-    streaming=True    # リアルタイム出力のためのストリーミング
-)
-exploration_model = model
-reflection_model = ChatOpenAI(model="gpt-4o", temperature=0.1)  # 反省にはさらに低い温度
-
-# タスク反省機能を初期化
-task_reflector = TaskReflector(llm=reflection_model, reflection_manager=reflection_manager)
+from domain.schemas import LeafNodeAnalysis
+from domain.roitree import ROINode, create_default_roi_tree, get_leaf_nodes, mermaid_to_roi_tree
 
 
-# =========================
-# ヘルパー関数
-# =========================
+# Challenge agent system prompt
+CHALLENGE_SYSTEM_PROMPT = """# ROI Tree Analysis Expert
 
-def find_node_by_path(root_node: ROINode, node_path: NodePath) -> Optional[ROINode]:
-    """パスからノードを見つける"""
-    if not node_path:
-        return root_node
-        
-    current_node = root_node
-    for node_id in node_path:
-        found = current_node.find_node_by_id(node_id)
-        if found:
-            current_node = found
-        else:
-            return None
-            
-    return current_node
+あなたはビジネス課題をROIの観点から構造化する専門エージェントです。
+ユーザーから与えられる事業・組織の課題文を解析し、ROIを「コスト削減」と「売上拡大」の2つに分岐してツリー構造を生成してください。
 
+## ROIツリー作成の条件:
+- 課題を「コスト削減」と「売上拡大」の2つの主要カテゴリに分解する
+- 各カテゴリの下に、より具体的なサブカテゴリを特定する
+- サブカテゴリの下に、具体的な項目を特定する
+- 文章中に明示的に数値目標が記載されている場合のみ、その値をノードに含める
+- 数値目標が不明確な場合は、数値を含めずにノードを作成する
+- 「課題要因」という抽象的なノードは含めず、具体的なタスクや目的をノードとする
 
-def get_tree_context(state: DeepdiveState) -> str:
-    """プロンプト用の現在のROIツリーコンテキストを取得"""
-    if not state["root_node"]:
-        return "まだROIツリーが作成されていません。"
-        
-    # ツリーを表示用にフォーマット
-    tree_text = format_tree_for_display(state["root_node"])
-    
-    # 現在のノードとパスの情報を取得
-    nodes_dict = build_nodes_dictionary(state["root_node"])
-    path_text = get_node_path_string(state["node_path"], nodes_dict)
-    
-    return f"""ROIツリー構造:
-{tree_text}
-
-現在のパス: {path_text}
+## 出力:
+- ROIツリーはMermaid記法で表現し、graph TDで開始すること
+- 数値目標が明確な場合のみ、ノードにその値を含める（例: `node1["製造効率向上 (1億円削減)"]`）
+- 数値目標が不明確な場合はノードに値を含めない（例: `node1["製造効率向上"]`）
+- 勝手に数値を追加しないこと。入力文から明示的に読み取れる数値のみを使用すること。
 """
 
 
-def update_roi_tree(
-    state: DeepdiveState, 
-    updates: List[ROINodeUpdate]
-) -> Tuple[DeepdiveState, List[str]]:
-    """
-    解析された更新情報に基づいてROIツリーを更新
+class ChallengeAgent:
+    """Simplified agent for exploring business challenges and creating ROI trees"""
     
-    Args:
-        state: 現在の状態
-        updates: ノード更新のリスト
-        
-    Returns:
-        更新された状態と更新説明のリスト
-    """
-    if not state["root_node"]:
-        # ツリーが存在しない場合、デフォルトツリーで初期化
-        state["root_node"] = create_default_roi_tree()
-        if not state["current_node_id"]:
-            state["current_node_id"] = state["root_node"].node_id
-            state["node_path"] = [state["root_node"].node_id]
-    
-    # 現在のノードを検索
-    current_node = None
-    if state["current_node_id"]:
-        current_node = find_node_by_path(state["root_node"], state["node_path"])
-    
-    if not current_node:
-        current_node = state["root_node"]
-        state["current_node_id"] = current_node.node_id
-        state["node_path"] = [current_node.node_id]
-    
-    # 更新を適用
-    update_descriptions = []
-    
-    for update in updates:
-        parent_node = current_node
-        
-        # 親ノードIDが指定されている場合、検索
-        if update.parent_node_id:
-            parent_search = state["root_node"].find_node_by_id(update.parent_node_id)
-            if parent_search:
-                parent_node = parent_search
-        
-        # 新しいノードを作成して追加
-        new_node = ROINode(
-            name=update.name,
-            details=update.details,
-            importance_factor=update.importance_factor,
-            value=update.value
-        )
-        
-        parent_node.add_child(new_node)
-        
-        # ユーザーフィードバック用の更新説明
-        update_descriptions.append(
-            f"ノード '{new_node.name}' を '{parent_node.name}' の下に追加しました "
-            f"（重要度係数: {new_node.importance_factor:.1%}）"
-        )
-        
-        # 現在のフォーカスを新しいノードに更新
-        state["current_node_id"] = new_node.node_id
-        
-        # ノードパスを更新
-        if parent_node.node_id in state["node_path"]:
-            # パス内の親の位置を検索
-            idx = state["node_path"].index(parent_node.node_id)
-            # パスを親まで切り詰めて新しいノードを追加
-            state["node_path"] = state["node_path"][:idx+1] + [new_node.node_id]
-        else:
-            # 新しいノードをパスに追加
-            state["node_path"].append(new_node.node_id)
-    
-    # 重要度係数を正規化
-    state["root_node"].normalize_importance_factors()
-    
-    # 現在のノードをまだ探索履歴にない場合は追加
-    if state["current_node_id"] not in state["exploration_history"]:
-        state["exploration_history"].append(state["current_node_id"])
-    
-    return state, update_descriptions
-
-
-# =========================
-# グラフノード（エージェントステップ）
-# =========================
-
-def deepdive_conversation(state: DeepdiveState) -> DeepdiveState:
-    """
-    ユーザーの入力に基づいてROIツリー探索を行う（自動会話生成なし）
-    """
-    # 現在のノード情報を取得
-    current_node = None
-    current_node_name = "ルート"
-    current_node_details = "トップレベルのROIコンポーネント"
-    
-    if state["current_node_id"]:
-        current_node = find_node_by_path(state["root_node"], state["node_path"])
-        if current_node:
-            current_node_name = current_node.name
-            current_node_details = current_node.details or "詳細情報なし"
-    
-    # プロンプト用のツリーコンテキストを取得
-    tree_context = get_tree_context(state)
-    
-    # 関連する過去のリフレクションを取得
-    relevant_reflections = reflection_manager.get_relevant_reflections(
-        f"{current_node_name} {current_node_details}"
-    )
-    reflection_text = format_reflections(relevant_reflections)
-    
-    # 最新のユーザーメッセージを取得
-    latest_user_message = None
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            latest_user_message = msg.content
-            break
-    
-    if not latest_user_message:
-        # 初回の場合や、ユーザーメッセージがない場合はデフォルトの応答を返す
-        response_content = f"""
-ROIツリーへようこそ！現在、「{current_node_name}」ノードに焦点を当てています。
-このROIツリーは「コスト削減」と「売上増加」の観点から、ビジネス機会を分析するために使用されます。
-
-具体的な質問や、さらに深掘りしたい領域について教えてください。
+    def __init__(self, model_name: str = "gpt-4o"):
         """
-        response = AIMessage(content=response_content)
-    else:
-        # 探索プロンプトを使用して応答を生成
-        system_message = SystemMessage(content=DEEPDIVE_SYSTEM_PROMPT + 
-            f"\n\n以下の過去のリフレクションを考慮してください:\n{reflection_text}\n\n" +
-            "特に重要: すべての応答は必ず日本語で行ってください。")
+        Initialize the challenge agent
         
-        messages = state["messages"][-5:] + [
-            HumanMessage(content=f"""
-現在のROIツリーコンテキスト:
-{tree_context}
+        Args:
+            model_name: Name of the OpenAI model to use
+        """
+        self.llm = ChatOpenAI(
+            model=model_name,
+            temperature=0.2,
+            streaming=True  # ストリーミングを有効化
+        )
+        
+        self.reflection_llm = ChatOpenAI(
+            model=model_name,
+            temperature=0.1,
+            streaming=False  # 分析には高速レスポンスが必要
+        )
+        
+        # Create prompt templates
+        self.challenge_prompt = ChatPromptTemplate.from_messages([
+            ("system", CHALLENGE_SYSTEM_PROMPT),
+            ("human", """以下のビジネス課題を解析し、ROIツリーを作成してください。
+明示的に数値目標が示されている場合のみ、その値をノードに含めてください。数値が不明確な場合は、値を含めずにノードを作成してください。
 
-現在のフォーカス: {current_node_name}
-説明: {current_node_details}
+ビジネス課題:
+{challenge_text}
 
-ユーザーからの質問/入力: {latest_user_message}
-
-ROIツリーについての対話を続けてください。質問に回答するか、ROIツリーのさらなる展開についてアドバイスしてください。
-
-重要度係数について考えることを忘れないでください - 各サブコンポーネントは兄弟コンポーネントと比較してどの程度重要ですか？重要度係数は兄弟間で合計100%になるようにしてください。
-
-過去のリフレクションに基づいた改善点も考慮してください。
-
-必ず日本語で回答してください。
+Mermaid記法でROIツリーを表現してください。数値目標がわかる場合のみ、それをノードに含めてください。
 """)
-        ]
+        ])
         
-        response = exploration_model.invoke([system_message] + messages)
-    
-    # 応答をメッセージリストに追加（ユーザーメッセージは既に追加されているはず）
-    state["messages"].append(response)
-    
-    # 応答を解析してノード更新を抽出
-    updates = parse_roi_node_update(response)
-    
-    if updates:
-        # ROIツリーに更新を適用
-        state, update_descriptions = update_roi_tree(state, updates)
-    
-    # タスクと結果に対する反省を実行
-    context = {
-        "node_name": current_node_name,
-        "node_details": current_node_details,
-        "tree_context": tree_context,
-    }
-    
-    task_reflector.run(
-        task=f"ROIツリーノード「{current_node_name}」の探索",
-        result=response.content,
-        context=context
-    )
-    
-    return state
+        # Reflection prompt for analyzing leaf nodes
+        self.reflection_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたはROIツリーの分析専門家です。末端ノード（子を持たないノード）の分析をして、
+数値目標が適切に設定されているかを判断してください。
 
+分析では以下を判定してください:
+1. すべての末端ノードに数値目標が設定されているか
+2. 数値目標が設定されていないノードはどれか
+3. ツリー全体の完成度（パーセンテージ）
 
-def self_reflect_deepdive(state: DeepdiveState) -> DeepdiveState:
-    """
-    LLMを使用してROIツリー探索が十分かどうかを評価する
-    """
-    # 自己反省のコンテキストを準備
-    tree_stats = get_tree_statistics(state["root_node"])
+レスポンスは以下のJSON形式で返してください:
+```json
+{{
+  "has_numerical_data": true/false,
+  "missing_nodes": ["ノード名1", "ノード名2"],
+  "incomplete_nodes": [
+    {{"name": "ノード名", "issue": "問題の説明", "suggestion": "改善提案"}}
+  ],
+  "completion_percentage": 0-100
+}}
+```"""),
+            ("human", "以下のROIツリーの末端ノードを分析してください：\n\n{mermaid_diagram}\n\n末端ノードのリスト：\n{leaf_nodes}")
+        ])
     
-    # 完全なツリー表現を取得
-    full_tree = format_tree_for_display(state["root_node"])
-    mermaid_diagram = generate_mermaid_diagram(state["root_node"])
-    
-    # 探索履歴を読みやすいフォーマットに変換
-    nodes_dict = build_nodes_dictionary(state["root_node"])
-    exploration_history = []
-    
-    for node_id in state["exploration_history"]:
-        if node_id in nodes_dict:
-            exploration_history.append(nodes_dict[node_id].name)
-    
-    # 関連する過去のリフレクションを取得
-    relevant_reflections = reflection_manager.get_relevant_reflections("ROIツリー探索の完了判断")
-    reflection_context = format_reflections(relevant_reflections)
-    
-    # 反省プロンプトを生成
-    reflection_input = DEEPDIVE_REFLECTION_PROMPT.format(
-        messages=state["messages"][-5:],  # コンテキストには最近のメッセージのみ使用
-        full_tree_representation=full_tree,
-        exploration_history=", ".join(exploration_history),
-        total_nodes=tree_stats["total_nodes"],
-        max_depth=tree_stats["max_depth"],
-        min_nodes_per_branch=state["min_nodes_per_branch"],
-        shallow_branches=", ".join(tree_stats["shallow_branches"])
-    )
-    
-    try:
-        # LLMから反省を取得
-        reflection_system_message = SystemMessage(content=f"""あなたはROIツリー分析の完全性を評価する専門家です。
-あなたの仕事はROIツリーのブランチが十分に探索されたかどうかを判断することです。
-
-十分に探索されたブランチは以下の特徴を持つべきです:
-1. 適切な深さ（通常3〜4レベル）
-2. 葉ノードに具体的で測定可能な要素を含む
-3. カテゴリの主要コンポーネントをカバーしている
-4. 兄弟間で合理的な重要度係数が割り当てられている
-
-以下の過去のリフレクションも考慮してください:
-{reflection_context}
-
-正確な単一行のJSON形式で応答してください。改行を含めないでください。
-""")
+    def create_roi_tree(self, challenge_text: str) -> Tuple[ROINode, str]:
+        """
+        Create an ROI tree from a challenge description
         
-        reflection_messages = [
-            reflection_system_message,
-            HumanMessage(content=reflection_input)
-        ]
-        
-        reflection_response = reflection_model.invoke(reflection_messages)
-        
-        # 反省を解析
-        success, analysis = parse_reflection_analysis(reflection_response)
-        
-        if success and analysis:
-            state["self_reflection"] = analysis
-            state["exploration_complete"] = not analysis.deepdive_needed
+        Args:
+            challenge_text: Text describing the business challenge
             
-            # フォーカスが提案されており、探索が完了していない場合、そのノードに移動を試みる
-            if analysis.suggested_focus and not state["exploration_complete"]:
-                # まず名前でノードを検索（簡易実装）
-                nodes_dict = build_nodes_dictionary(state["root_node"])
-                for node_id, node in nodes_dict.items():
-                    if node.name.lower() == analysis.suggested_focus.lower():
-                        state["current_node_id"] = node_id
-                        # このノードへのパスを再構築（簡易化）
-                        state["node_path"] = [state["root_node"].node_id, node_id]
-                        break
+        Returns:
+            Tuple of (ROI tree root node, Mermaid diagram)
+        """
+        # Generate ROI tree using LLM
+        messages = self.challenge_prompt.format_messages(
+            challenge_text=challenge_text
+        )
+        
+        response = self.llm.invoke(messages)
+        
+        # Extract Mermaid diagram from response
+        mermaid_diagram = self._extract_mermaid(response.content)
+        
+        # Convert Mermaid diagram to ROI tree
+        root_node = mermaid_to_roi_tree(mermaid_diagram)
+        
+        # If parsing failed, create a default tree
+        if not root_node:
+            root_node = create_default_roi_tree()
+            mermaid_diagram = root_node.get_full_mermaid()
+        
+        return root_node, mermaid_diagram
+    
+    def analyze_leaf_nodes(self, root_node: ROINode, mermaid_diagram: str) -> LeafNodeAnalysis:
+        """
+        Analyze leaf nodes to check if they have appropriate numerical targets
+        
+        Args:
+            root_node: ROI tree root node
+            mermaid_diagram: Mermaid diagram of the ROI tree
             
-            # リフレクション結果を記録
-            task_reflector.run(
-                task="ROIツリー探索の完了判断",
-                result=f"探索完了度: {analysis.deepdive_completion_percentage}%, 理由: {analysis.reason}",
-                context={
-                    "tree_stats": tree_stats,
-                    "needs_further_exploration": analysis.deepdive_needed,
-                    "suggested_focus": analysis.suggested_focus
-                }
+        Returns:
+            Analysis of leaf nodes
+        """
+        # Get all leaf nodes
+        leaf_nodes = get_leaf_nodes(root_node)
+        
+        # Format leaf nodes for the prompt
+        leaf_nodes_text = "\n".join([
+            f"- {node.name}" + (f" (値: {node.value})" if node.value is not None else " (値なし)")
+            for node in leaf_nodes
+        ])
+        
+        # Analyze leaf nodes using LLM
+        messages = self.reflection_prompt.format_messages(
+            mermaid_diagram=mermaid_diagram,
+            leaf_nodes=leaf_nodes_text
+        )
+        
+        response = self.reflection_llm.invoke(messages)
+        
+        # Extract JSON from response
+        analysis_json = self._extract_json(response.content)
+        
+        try:
+            return LeafNodeAnalysis(**analysis_json)
+        except Exception as e:
+            print(f"Error parsing leaf node analysis: {str(e)}")
+            # Return default analysis if parsing fails
+            return LeafNodeAnalysis(
+                has_numerical_data=any(node.value is not None for node in leaf_nodes),
+                missing_nodes=[node.name for node in leaf_nodes if node.value is None],
+                incomplete_nodes=[],
+                completion_percentage=50.0
             )
-        else:
-            # 解析に失敗した場合のフォールバック
-            state["iteration_count"] += 1
-            state["exploration_complete"] = state["iteration_count"] >= state["max_iterations"]
-    except Exception as e:
-        print(f"自己反省中にエラーが発生しました: {str(e)}")
-        # エラーの場合のフォールバック
-        state["iteration_count"] += 1
-        state["exploration_complete"] = state["iteration_count"] >= state["max_iterations"]
     
-    return state
-
-
-def should_continue_deepdive(state: DeepdiveState) -> Literal["continue", "__end__"]:
-    """探索を続けるかどうかを決定"""
-    return "continue" if not state["exploration_complete"] else "__end__"
-
-
-# =========================
-# グラフ構築
-# =========================
-
-def build_deepdive_graph() -> Any:  # 循環インポートを避けるためAny型を使用
-    """深掘りエージェントグラフを構築してコンパイル"""
-    graph = StateGraph(DeepdiveState)
+    def _extract_mermaid(self, text: str) -> str:
+        """Extract Mermaid diagram from text"""
+        lines = text.split('\n')
+        mermaid_lines = []
+        in_mermaid = False
+        
+        for line in lines:
+            if line.strip() == '```mermaid' or line.strip() == '```':
+                in_mermaid = not in_mermaid
+                continue
+                
+            if in_mermaid:
+                mermaid_lines.append(line)
+        
+        # If no code block was found, look for graph TD
+        if not mermaid_lines:
+            started = False
+            for line in lines:
+                if line.strip().startswith('graph TD'):
+                    started = True
+                    mermaid_lines.append(line.strip())
+                elif started:
+                    mermaid_lines.append(line.strip())
+        
+        return '\n'.join(mermaid_lines)
     
-    # ノード追加
-    graph.add_node("deepdive_conversation", deepdive_conversation)
-    graph.add_node("self_reflect_deepdive", self_reflect_deepdive)
-    
-    # エッジ追加
-    graph.add_edge("deepdive_conversation", "self_reflect_deepdive")
-    graph.add_conditional_edges(
-        "self_reflect_deepdive",
-        should_continue_deepdive,
-        {
-            "continue": "deepdive_conversation",
-            "__end__": END
-        }
-    )
-    
-    graph.set_entry_point("deepdive_conversation")
-    
-    return graph.compile()
-
-
-def init_deepdive_state() -> DeepdiveState:
-    """深掘り状態を初期化"""
-    return DeepdiveState(
-        messages=[],
-        root_node=create_default_roi_tree(),
-        current_node_id=None,
-        node_path=[],
-        exploration_history=[],
-        iteration_count=0,
-        max_iterations=10,
-        min_nodes_per_branch=3,
-        self_reflection=None,
-        exploration_complete=False
-    )
+    def _extract_json(self, text: str) -> Dict[str, Any]:
+        """Extract JSON from text"""
+        try:
+            # Try to find JSON in a code block
+            import re
+            json_match = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(1)
+                return json.loads(json_str)
+            
+            # If no code block, try to find JSON-like structure
+            json_match = re.search(r'({.*})', text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+                return json.loads(json_str)
+            
+            # Default empty response
+            return {}
+        except Exception as e:
+            print(f"Error extracting JSON: {str(e)}")
+            return {}

@@ -1,5 +1,5 @@
 """
-Streamlit app for ROI Analysis with natural language understanding and real streaming
+Streamlit app for ROI Analysis with enhanced tree editing capabilities
 """
 import streamlit as st
 import streamlit.components.v1 as components
@@ -99,6 +99,25 @@ def extract_leaf_nodes(mermaid_code):
     return result
 
 
+def extract_all_nodes(mermaid_code):
+    """
+    Mermaidコードからすべてのノードとそのラベルを抽出する
+    """
+    node_definitions = {}
+    lines = mermaid_code.strip().split('\n')
+    
+    # ノードの定義をキャプチャ
+    for line in lines:
+        # ノード定義をキャプチャ（例: node1["テキスト"]）
+        matches = re.findall(r'(\w+)\[\"([^\"]+)\"', line)
+        for match in matches:
+            node_id = match[0]
+            node_label = match[1]
+            node_definitions[node_id] = node_label
+    
+    return node_definitions
+
+
 def has_numerical_value(node_label: str) -> bool:
     """
     ノードラベルに数値情報（金額、パーセンテージなど）が含まれているかをチェック
@@ -157,6 +176,87 @@ def update_node_value_in_mermaid(mermaid_code, node_id, new_value):
     return '\n'.join(updated_lines)
 
 
+def update_node_label_in_mermaid(mermaid_code, node_id, new_label):
+    """
+    指定したノードIDのノードのラベルを変更する
+    """
+    lines = mermaid_code.strip().split('\n')
+    updated_lines = []
+    
+    for line in lines:
+        # ノード定義を検索（例: node1["テキスト"]）
+        node_match = re.search(rf'({node_id}\[\")([^\"]+)(\"\])', line)
+        if node_match:
+            # 値の部分を保持
+            current_label = node_match.group(2)
+            value_pattern = r'\s*\(([^)]+)\)'
+            value_match = re.search(value_pattern, current_label)
+            
+            if value_match:
+                # 値を保持して新しいラベルに適用
+                value = value_match.group(1)
+                updated_label = f"{new_label} ({value})"
+            else:
+                # 値がない場合は単純に置き換え
+                updated_label = new_label
+            
+            # 行を更新
+            updated_line = f'{node_match.group(1)}{updated_label}{node_match.group(3)}'
+            updated_lines.append(updated_line)
+        else:
+            updated_lines.append(line)
+    
+    return '\n'.join(updated_lines)
+
+
+def add_child_node_in_mermaid(mermaid_code, parent_id, child_label, child_value=None):
+    """
+    既存のノードに子ノードを追加する
+    """
+    lines = mermaid_code.strip().split('\n')
+    
+    # 新しい子ノードのIDを生成
+    all_node_ids = set()
+    for line in lines:
+        # 既存のノードIDを抽出
+        matches = re.findall(r'(\w+)\[\"', line)
+        for match in matches:
+            all_node_ids.add(match)
+    
+    # 新しいIDを見つける
+    child_id = None
+    for i in range(1, 1000):
+        test_id = f"node{i}"
+        if test_id not in all_node_ids:
+            child_id = test_id
+            break
+    
+    if not child_id:
+        return mermaid_code  # 安全策：IDが見つからない場合は変更しない
+    
+    # 子ノードの定義と接続を追加
+    child_def = f'{child_id}["{child_label}{" (" + child_value + ")" if child_value else ""}"]'
+    connection = f'{parent_id} --> {child_id}'
+    
+    # 図の開始行（graph TDなど）を見つける
+    graph_start_index = -1
+    for i, line in enumerate(lines):
+        if line.strip().startswith('graph ') or line.strip().startswith('flowchart '):
+            graph_start_index = i
+            break
+    
+    if graph_start_index >= 0:
+        # グラフ定義の直後に追加
+        lines.insert(graph_start_index + 1, child_def)
+        lines.append(connection)  # 接続は最後に追加
+    else:
+        # 開始行がなければ最初に追加
+        lines.insert(0, child_def)
+        lines.append(connection)
+    
+    return '\n'.join(lines)
+
+
 def generate_node_question(nodes_without_values):
     """
     数値が欠けているノードについて質問を生成する
@@ -191,16 +291,42 @@ class NLUAgent:
         
         # 解析用のプロンプト
         self.extract_prompt = ChatPromptTemplate.from_messages([
-            ("system", """あなたはROIツリー分析の専門家です。ユーザーの自然言語メッセージからノード名と数値情報を正確に抽出してください。
+            ("system", """あなたはROIツリー分析の専門家です。ユーザーの自然言語メッセージからノード名と数値情報、およびノード編集操作を正確に抽出してください。
 
-以下のJSON形式で回答してください:
+以下のいずれかの操作を検出し、適切なJSONを返してください:
+
+1. 数値の追加/更新:
 ```json
 {{
-  "found_node": true/false,  // ノード名が見つかったかどうか
-  "node_name": "抽出したノード名", // 見つかった場合のノード名
-  "found_value": true/false,  // 数値が見つかったかどうか
-  "value": "抽出した数値",     // 見つかった場合の数値（単位を含む）
-  "confidence": 0-100        // 抽出結果の確信度（0-100）
+  "operation": "add_value",
+  "found_node": true/false,
+  "node_name": "抽出したノード名",
+  "found_value": true/false,
+  "value": "抽出した数値",
+  "confidence": 0-100
+}}
+```
+
+2. ノードの書き換え:
+```json
+{{
+  "operation": "rename_node",
+  "found_node": true/false,
+  "node_name": "対象のノード名",
+  "new_label": "新しいノード名",
+  "confidence": 0-100
+}}
+```
+
+3. 子ノードの追加:
+```json
+{{
+  "operation": "add_child",
+  "found_node": true/false,
+  "parent_node": "親ノード名",
+  "child_label": "新しい子ノード名",
+  "child_value": "子ノードの値(オプション)",
+  "confidence": 0-100
 }}
 ```
 
@@ -209,8 +335,9 @@ class NLUAgent:
 - ノード名は完全一致でなくても、明らかに指しているノードがあれば抽出してください
 - 抽出できない場合は対応するフィールドをfalseにしてください
 - 確信度は抽出結果の信頼性を0-100で表してください
+- ユーザーのメッセージから最も適切な操作を1つだけ選択してください
 """),
-            ("human", """以下のユーザーメッセージから、ノード名と数値情報を抽出してください。
+            ("human", """以下のユーザーメッセージから、ノード操作情報を抽出してください。
 
 ユーザーメッセージ: "{message}"
 
@@ -221,11 +348,11 @@ JSON形式で回答してください。
 """)
         ])
     
-    def extract_node_and_value(self, message: str, mermaid_diagram: str) -> Dict:
-        """ユーザーメッセージからノード名と数値を抽出する"""
+    def extract_operation(self, message: str, mermaid_diagram: str) -> Dict:
+        """ユーザーメッセージからノード操作情報を抽出する"""
         # 利用可能なノードのリストを作成
-        leaf_nodes = extract_leaf_nodes(mermaid_diagram)
-        node_list = "\n".join([f"- {label}" for _, label in leaf_nodes])
+        all_nodes = extract_all_nodes(mermaid_diagram)
+        node_list = "\n".join([f"- {label}" for _, label in all_nodes.items()])
         
         # LLMで解析
         result = self.llm.invoke(
@@ -248,35 +375,53 @@ JSON形式で回答してください。
                 # JSONブロックがない場合、全体を解析
                 extraction_result = json.loads(result.content)
             
-            # ノードIDの検索（抽出されたノード名に近いノードを検索）
-            node_id = None
-            if extraction_result.get("found_node", False) and extraction_result.get("node_name"):
+            # 操作タイプに応じた処理
+            operation = extraction_result.get("operation", "")
+            
+            # 数値追加/更新の場合はノードIDを検索
+            if operation == "add_value" and extraction_result.get("found_node", False):
                 node_name = extraction_result["node_name"]
                 
                 # ノード名が類似するノードを検索
-                for nid, label in leaf_nodes:
-                    # 簡易的な類似度チェック（部分文字列）
+                for node_id, label in all_nodes.items():
                     if node_name.lower() in label.lower() or label.lower() in node_name.lower():
-                        node_id = nid
+                        extraction_result["node_id"] = node_id
                         extraction_result["matched_label"] = label
                         break
             
-            extraction_result["node_id"] = node_id
+            # ノード書き換えの場合もノードIDを検索
+            elif operation == "rename_node" and extraction_result.get("found_node", False):
+                node_name = extraction_result["node_name"]
+                
+                for node_id, label in all_nodes.items():
+                    if node_name.lower() in label.lower() or label.lower() in node_name.lower():
+                        extraction_result["node_id"] = node_id
+                        extraction_result["matched_label"] = label
+                        break
+            
+            # 子ノード追加の場合は親ノードIDを検索
+            elif operation == "add_child" and extraction_result.get("found_node", False):
+                parent_node = extraction_result["parent_node"]
+                
+                for node_id, label in all_nodes.items():
+                    if parent_node.lower() in label.lower() or label.lower() in parent_node.lower():
+                        extraction_result["parent_id"] = node_id
+                        extraction_result["matched_parent"] = label
+                        break
+            
             return extraction_result
             
         except Exception as e:
             print(f"JSON解析エラー: {e}")
             return {
-                "found_node": False,
-                "found_value": False,
-                "confidence": 0,
+                "operation": "unknown",
                 "error": str(e)
             }
     
     def analyze_conversation(self, conversation_history: List, current_message: str, mermaid_diagram: str) -> Dict:
         """会話の文脈を考慮してメッセージを分析する"""
         # まず単純に現在のメッセージだけで分析
-        initial_result = self.extract_node_and_value(current_message, mermaid_diagram)
+        initial_result = self.extract_operation(current_message, mermaid_diagram)
         
         # 高確信度の結果が得られた場合はそのまま返す
         if initial_result.get("confidence", 0) > 80:
@@ -289,19 +434,45 @@ JSON形式で回答してください。
         ])
         
         context_prompt = ChatPromptTemplate.from_messages([
-            ("system", """あなたはROIツリー分析の専門家です。会話の文脈を考慮して、最新のユーザーメッセージからノード名と数値情報を抽出してください。
+            ("system", """あなたはROIツリー分析の専門家です。会話の文脈を考慮して、最新のユーザーメッセージからノード操作情報を抽出してください。
 
-以下のJSON形式で回答してください:
+以下のいずれかの操作を検出し、適切なJSONを返してください:
+
+1. 数値の追加/更新:
 ```json
 {{
+  "operation": "add_value",
   "found_node": true/false,
   "node_name": "抽出したノード名",
   "found_value": true/false,
   "value": "抽出した数値",
   "confidence": 0-100
 }}
+```
+
+2. ノードの書き換え:
+```json
+{{
+  "operation": "rename_node",
+  "found_node": true/false,
+  "node_name": "対象のノード名",
+  "new_label": "新しいノード名",
+  "confidence": 0-100
+}}
+```
+
+3. 子ノードの追加:
+```json
+{{
+  "operation": "add_child",
+  "found_node": true/false,
+  "parent_node": "親ノード名",
+  "child_label": "新しい子ノード名",
+  "child_value": "子ノードの値(オプション)",
+  "confidence": 0-100
+}}
 ```"""),
-            ("human", """以下の会話の文脈を考慮して、最新のユーザーメッセージからノード名と数値情報を抽出してください。
+            ("human", """以下の会話の文脈を考慮して、最新のユーザーメッセージからノード操作情報を抽出してください。
 
 会話の文脈:
 {context}
@@ -316,8 +487,8 @@ JSON形式で回答してください。
         ])
         
         # 利用可能なノードのリストを作成
-        leaf_nodes = extract_leaf_nodes(mermaid_diagram)
-        node_list = "\n".join([f"- {label}" for _, label in leaf_nodes])
+        all_nodes = extract_all_nodes(mermaid_diagram)
+        node_list = "\n".join([f"- {label}" for _, label in all_nodes.items()])
         
         result = self.llm.invoke(
             context_prompt.format(
@@ -339,18 +510,39 @@ JSON形式で回答してください。
                 # JSONブロックがない場合、全体を解析
                 context_result = json.loads(result.content)
             
-            # ノードIDの検索
-            node_id = None
-            if context_result.get("found_node", False) and context_result.get("node_name"):
+            # 操作タイプに応じた処理
+            operation = context_result.get("operation", "")
+            
+            # 数値追加/更新の場合はノードIDを検索
+            if operation == "add_value" and context_result.get("found_node", False):
                 node_name = context_result["node_name"]
                 
-                for nid, label in leaf_nodes:
+                for node_id, label in all_nodes.items():
                     if node_name.lower() in label.lower() or label.lower() in node_name.lower():
-                        node_id = nid
+                        context_result["node_id"] = node_id
                         context_result["matched_label"] = label
                         break
             
-            context_result["node_id"] = node_id
+            # ノード書き換えの場合もノードIDを検索
+            elif operation == "rename_node" and context_result.get("found_node", False):
+                node_name = context_result["node_name"]
+                
+                for node_id, label in all_nodes.items():
+                    if node_name.lower() in label.lower() or label.lower() in node_name.lower():
+                        context_result["node_id"] = node_id
+                        context_result["matched_label"] = label
+                        break
+            
+            # 子ノード追加の場合は親ノードIDを検索
+            elif operation == "add_child" and context_result.get("found_node", False):
+                parent_node = context_result["parent_node"]
+                
+                for node_id, label in all_nodes.items():
+                    if parent_node.lower() in label.lower() or label.lower() in parent_node.lower():
+                        context_result["parent_id"] = node_id
+                        context_result["matched_parent"] = label
+                        break
+            
             return context_result
             
         except Exception as e:
@@ -377,6 +569,11 @@ class ROIChatAgent:
 
 現在のROIツリーには、まだ数値が設定されていないノードがあります。自然な会話の中で、こうしたノードに適切な数値を設定できるよう誘導してください。
 
+ユーザーは以下のような操作ができることを教えてください:
+1. ノードに数値を追加する: 「〇〇ノードには△△円の効果を見込んでいます」
+2. ノード名を変更する: 「〇〇ノードの名前を△△に変更してください」
+3. 既存のノードに子ノードを追加する: 「〇〇ノードに△△という子ノードを追加してください」
+
 レスポンスでは以下を心がけてください：
 - 会話は親しみやすく自然な流れを保つ
 - 数値情報のリクエストは押し付けがましくならないよう配慮する
@@ -388,6 +585,38 @@ class ROIChatAgent:
 {nodes_without_values}
 """),
             ("human", "{user_message}")
+        ])
+        
+        # 初期メッセージ生成用のプロンプト
+        self.initial_message_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたはROIツリー分析のエキスパートです。ROIツリーの初期分析を行い、ユーザーに対して最初のメッセージを送信します。
+
+現在のROIツリーには、数値が設定されていないノードがあります。初期メッセージでは以下を含めてください：
+1. ROIツリーの全体的な評価
+2. 数値が設定されていないノードのリスト
+3. 最初に情報を収集すべきノードについての質問
+
+また、ユーザーは以下のような操作ができることを伝えてください:
+1. ノードに数値を追加する: 「〇〇ノードには△△円の効果を見込んでいます」
+2. ノード名を変更する: 「〇〇ノードの名前を△△に変更してください」
+3. 既存のノードに子ノードを追加する: 「〇〇ノードに△△という子ノードを追加してください」
+4. チャットを終了して提案生成に進む: 「提案に進む」
+
+レスポンスでは以下を心がけてください：
+- 明確で具体的な質問をする
+- 友好的でプロフェッショナルな調子を保つ
+- ユーザーが数値情報を簡単に提供できるよう促す
+"""),
+            ("human", """ROIツリーの初期分析を行い、最初のメッセージを生成してください。
+
+ROIツリー:
+{mermaid_diagram}
+
+数値が設定されていないノード:
+{missing_nodes}
+
+初期メッセージを生成してください。
+""")
         ])
     
     def get_response(self, user_message: str, conversation_history: List, mermaid_diagram: str, callback=None):
@@ -409,6 +638,34 @@ class ROIChatAgent:
                 self.chat_prompt.format(
                     nodes_without_values=nodes_text,
                     user_message=user_message
+                )
+            )
+        
+        return response.content
+    
+    def get_initial_message(self, mermaid_diagram: str, callback=None):
+        """チャット開始時の初期メッセージを生成する"""
+        # 数値が設定されていないノードを取得
+        nodes_without_values = extract_nodes_without_values(mermaid_diagram)
+        
+        if not nodes_without_values:
+            return "すべての末端ノードには既に数値目標が設定されています。ROIツリーについて質問があればお気軽にどうぞ。編集が完了したら「提案に進む」と入力して提案生成に移ることができます。"
+        
+        nodes_text = "\n".join([f"- {label}" for _, label in nodes_without_values])
+        
+        # LLMで初期メッセージを生成
+        if callback:
+            response = self.llm.with_config({"callbacks": [callback]}).invoke(
+                self.initial_message_prompt.format(
+                    mermaid_diagram=mermaid_diagram,
+                    missing_nodes=nodes_text
+                )
+            )
+        else:
+            response = self.llm.invoke(
+                self.initial_message_prompt.format(
+                    mermaid_diagram=mermaid_diagram,
+                    missing_nodes=nodes_text
                 )
             )
         
@@ -651,31 +908,37 @@ def main():
             st.markdown("---")
             st.subheader("チャットでROIツリーを編集")
             
-            # チャット開始ボタン
+            # チャット開始ボタンとチャット終了ボタン
             chat_started = False
-            if not st.session_state.chat_active:
-                if st.button("チャットを開始", type="primary"):
-                    st.session_state.chat_active = True
-                    chat_started = True
-                    
-                    # 数値がないノードを抽出
-                    current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
-                    nodes_without_values = extract_nodes_without_values(current_mermaid)
-                    
-                    # 初期メッセージを生成
-                    if nodes_without_values:
-                        initial_message = f"ROIツリーの分析を始めます。{len(nodes_without_values)}個のノードにはまだ数値が設定されていません。自由に会話をしながら、各ノードの数値目標を設定していきましょう。"
-                        next_question = generate_node_question(nodes_without_values)
-                    else:
-                        initial_message = "ROIツリーの分析を始めます。すべてのノードに数値が設定されています。何か詳しく知りたい点はありますか？"
-                        next_question = ""
-                    
-                    # 初期メッセージをチャット履歴に追加
-                    st.session_state.chat_history.append(("assistant", initial_message))
-                    
-                    # 次の質問があれば追加
-                    if next_question:
-                        st.session_state.chat_history.append(("assistant", next_question))
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if not st.session_state.chat_active:
+                    if st.button("チャットを開始", type="primary"):
+                        st.session_state.chat_active = True
+                        chat_started = True
+                        
+                        # 数値がないノードを抽出
+                        current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
+                        
+                        # 初期メッセージをリアルタイムストリーミングで表示
+                        with st.chat_message("assistant"):
+                            stream_handler = StreamHandler(st)
+                            
+                            # 初期メッセージを生成
+                            initial_message = st.session_state.roi_chat_agent.get_initial_message(
+                                current_mermaid,
+                                callback=stream_handler
+                            )
+                        
+                        # 初期メッセージをチャット履歴に追加
+                        st.session_state.chat_history.append(("assistant", initial_message))
+            
+            with col2:
+                if st.session_state.chat_active:
+                    if st.button("提案生成へ進む", type="primary"):
+                        st.session_state.chat_active = False
+                        st.info("ROIツリーの編集を終了しました。「提案生成」タブで提案を作成できます。")
             
             # チャット履歴の表示
             chat_container = st.container()
@@ -696,6 +959,12 @@ def main():
             if st.session_state.chat_active and st.session_state.roi_chat_agent:
                 # ユーザー入力
                 if prompt := st.chat_input("メッセージを入力..."):
+                    # 「提案に進む」コマンドをチェック
+                    if "提案に進む" in prompt.lower() or "提案生成へ進む" in prompt.lower() or "提案へ進む" in prompt.lower():
+                        st.session_state.chat_active = False
+                        st.chat_message("system").write("ROIツリーの編集を終了しました。「提案生成」タブで提案を作成できます。")
+                        st.rerun()
+                    
                     # ユーザーのメッセージを表示
                     st.chat_message("user").write(prompt)
                     st.session_state.chat_history.append(("user", prompt))
@@ -704,20 +973,11 @@ def main():
                     current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
                     current_root = mermaid_to_roi_tree(current_mermaid)
                     
-                    # メッセージを分析して数値情報を抽出
+                    # メッセージを分析してノード操作情報を抽出
                     analysis_result = st.session_state.roi_chat_agent.analyze_message(
                         prompt, 
                         st.session_state.chat_history,
                         current_mermaid
-                    )
-                    
-                    # ツリーを更新すべきかどうかを判定
-                    should_update = (
-                        analysis_result.get("found_node", False) and 
-                        analysis_result.get("found_value", False) and 
-                        analysis_result.get("node_id") and 
-                        analysis_result.get("value") and
-                        analysis_result.get("confidence", 0) > 50  # 確信度が50%以上
                     )
                     
                     # 実際のレスポンスを生成（LLMストリーミング）
@@ -736,14 +996,37 @@ def main():
                     # チャット履歴に追加
                     st.session_state.chat_history.append(("assistant", response))
                     
-                    # ROIツリーを更新する必要がある場合
+                    # ツリーを更新すべきかどうかを判定
+                    operation = analysis_result.get("operation", "")
+                    confidence = analysis_result.get("confidence", 0)
+                    should_update = confidence > 50  # 確信度が50%以上
+                    
                     updated_mermaid = current_mermaid
+                    
+                    # 操作タイプに応じたツリー更新
                     if should_update:
-                        node_id = analysis_result["node_id"]
-                        value = analysis_result["value"]
+                        if operation == "add_value" and "node_id" in analysis_result:
+                            # 数値を追加または更新
+                            node_id = analysis_result["node_id"]
+                            value = analysis_result["value"]
+                            updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, value)
                         
-                        # ノードの値を更新
-                        updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, value)
+                        elif operation == "rename_node" and "node_id" in analysis_result:
+                            # ノード名を変更
+                            node_id = analysis_result["node_id"]
+                            new_label = analysis_result["new_label"]
+                            updated_mermaid = update_node_label_in_mermaid(current_mermaid, node_id, new_label)
+                        
+                        elif operation == "add_child" and "parent_id" in analysis_result:
+                            # 子ノードを追加
+                            parent_id = analysis_result["parent_id"]
+                            child_label = analysis_result["child_label"]
+                            child_value = analysis_result.get("child_value")
+                            updated_mermaid = add_child_node_in_mermaid(current_mermaid, parent_id, child_label, child_value)
+                    
+                    # ROIツリーを更新する必要がある場合
+                    if updated_mermaid != current_mermaid:
+                        # 更新された図からROIツリーを再構築
                         updated_root = mermaid_to_roi_tree(updated_mermaid)
                         
                         # 更新を保存
@@ -759,8 +1042,6 @@ def main():
                                 updated_root, updated_mermaid
                             )
                             st.session_state.analysis = updated_analysis
-                    
-                    # 次の質問（自動生成）は次のユーザー入力を待つ
                     
                     # ページをリロードして最新の状態を表示
                     st.rerun()
@@ -806,29 +1087,34 @@ def main():
             
             # 提案生成ボタン
             if st.button("提案を生成", type="primary"):
-                with st.spinner("提案を生成中..."):
-                    # 数値がないノードをチェック
-                    nodes_without_values = extract_nodes_without_values(current_mermaid)
-                    if nodes_without_values:
-                        st.warning(f"まだ{len(nodes_without_values)}個のノードに数値が設定されていません。より正確な提案のために、すべてのノードに数値を設定することをお勧めします。")
-                        missing_list = ", ".join([label for _, label in nodes_without_values])
-                        st.info(f"数値が設定されていないノード: {missing_list}")
+                # 数値がないノードをチェック
+                nodes_without_values = extract_nodes_without_values(current_mermaid)
+                if nodes_without_values:
+                    st.warning(f"まだ{len(nodes_without_values)}個のノードに数値が設定されていません。より正確な提案のために、すべてのノードに数値を設定することをお勧めします。")
+                    missing_list = ", ".join([label for _, label in nodes_without_values])
+                    st.info(f"数値が設定されていないノード: {missing_list}")
                     
+                    # 続行の確認
+                    if not st.button("それでも提案を生成する"):
+                        st.stop()
+                
+                with st.spinner("提案を生成中..."):
                     # ProposalAgentを初期化して実行
                     proposal_agent = ProposalAgent(model_name=model_name)
                     
                     # ストリーミング出力用のコンテナ
                     proposal_container = st.empty()
                     
-                    # ストリーミングハンドラ
-                    stream_handler = StreamHandler(proposal_container)
-                    
-                    # ストリーミングでの提案生成
-                    proposal_text, summary = proposal_agent.generate_proposal_streaming(
-                        current_mermaid,
-                        proposal_guidance,
-                        callback=stream_handler
-                    )
+                    with st.chat_message("assistant"):
+                        # ストリーミングハンドラ
+                        stream_handler = StreamHandler(st)
+                        
+                        # ストリーミングでの提案生成
+                        proposal_text, summary = proposal_agent.generate_proposal_streaming(
+                            current_mermaid,
+                            proposal_guidance,
+                            callback=stream_handler
+                        )
                     
                     # 結果を保存
                     st.session_state.proposal_text = proposal_text
