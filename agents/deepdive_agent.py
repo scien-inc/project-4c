@@ -1,4 +1,5 @@
 """
+agents/deepdive_agent.py
 Simplified Challenge Agent for ROI tree exploration
 """
 from typing import Dict, List, Tuple, Optional, Any

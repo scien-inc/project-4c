@@ -1,4 +1,5 @@
 """
+agents/proposal_agent.py
 Simplified Proposal Agent for ROI calculation and solution recommendation
 """
 from typing import Dict, List, Tuple, Optional, Any, Callable
