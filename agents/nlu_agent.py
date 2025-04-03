@@ -27,7 +27,7 @@ class NLUAgent:
 
 以下のJSON形式で回答してください:
 ```json
-{
+{{
   "found_node": true/false,  // ノード名が見つかったかどうか
   "node_name": "抽出したノード名", // 見つかった場合のノード名
   "found_value": true/false,  // 数値が見つかったかどうか
@@ -35,7 +35,7 @@ class NLUAgent:
   "value_unit": "単位",       // 数値の単位（円、時間、件、人など）
   "value_type": "数値の種類",  // 数値の種類（金額、時間、件数、人数など）
   "confidence": 0-100        // 抽出結果の確信度（0-100）
-}
+}}
 ```
 
 注意:
@@ -61,7 +61,7 @@ JSON形式で回答してください。
 
 以下のJSON形式で回答してください:
 ```json
-{
+{{
   "found_value": true/false,  // 数値が見つかったかどうか
   "value": 数値,              // 見つかった場合の数値
   "value_unit": "単位",       // 単位（円、時間、件、人など）
@@ -69,7 +69,7 @@ JSON形式で回答してください。
   "needs_conversion": true/false, // ROI計算のために変換が必要か
   "target_unit": "目標単位",   // 変換後の目標単位（通常は「円」）
   "additional_info_needed": ["必要な追加情報1", "必要な追加情報2"]
-}
+}}
 ```
 
 注意:
@@ -190,7 +190,7 @@ JSON形式で回答してください。
 
 以下のJSON形式で回答してください:
 ```json
-{
+{{
   "found_node": true/false,
   "node_name": "抽出したノード名",
   "found_value": true/false,
@@ -198,7 +198,7 @@ JSON形式で回答してください。
   "value_unit": "単位",
   "value_type": "数値の種類",
   "confidence": 0-100
-}
+}}
 ```"""),
             ("human", """以下の会話の文脈を考慮して、最新のユーザーメッセージからノード名と数値情報を抽出してください。
 
