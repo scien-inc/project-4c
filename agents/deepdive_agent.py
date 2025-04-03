@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 
-from domain.schemas import LeafNodeAnalysis
+from domain.schemas import LeafNodeAnalysis, NumericalValue
 from domain.roitree import ROINode, create_default_roi_tree, get_leaf_nodes, mermaid_to_roi_tree
 
 
@@ -27,6 +27,7 @@ CHALLENGE_SYSTEM_PROMPT = """# ROI Tree Analysis Expert
 - 文章中に明示的に数値目標が記載されている場合のみ、その値をノードに含める
 - 数値目標が不明確な場合は、数値を含めずにノードを作成する
 - 「課題要因」という抽象的なノードは含めず、具体的なタスクや目的をノードとする
+- 末端ノードについては、投資対効果(ROI)計算に必要な数値情報の種類を識別する（金額、時間、件数、人数など）
 
 ## 出力:
 - ROIツリーはMermaid記法で表現し、graph TDで開始すること
@@ -79,7 +80,8 @@ Mermaid記法でROIツリーを表現してください。数値目標がわか�
 分析では以下を判定してください:
 1. すべての末端ノードに数値目標が設定されているか
 2. 数値目標が設定されていないノードはどれか
-3. ツリー全体の完成度（パーセンテージ）
+3. 各末端ノードにどのような種類の数値情報が必要か（金額、時間、件数、人数など）
+4. ツリー全体の完成度（パーセンテージ）
 
 レスポンスは以下のJSON形式で返してください:
 ```json
@@ -87,12 +89,38 @@ Mermaid記法でROIツリーを表現してください。数値目標がわか�
   "has_numerical_data": true/false,
   "missing_nodes": ["ノード名1", "ノード名2"],
   "incomplete_nodes": [
-    {{"name": "ノード名", "issue": "問題の説明", "suggestion": "改善提案"}}
+    {{"name": "ノード名", "issue": "問題の説明", "suggestion": "改善提案", "value_type": "数値の種類（金額/時間/件数/人数など）", "value_unit": "単位（円/時間/件/人など）"}}
   ],
   "completion_percentage": 0-100
 }}
 ```"""),
             ("human", "以下のROIツリーの末端ノードを分析してください：\n\n{mermaid_diagram}\n\n末端ノードのリスト：\n{leaf_nodes}")
+        ])
+        
+        # Solution suggestion prompt
+        self.solution_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたはビジネス課題に対して最適なソリューションを提案する専門家です。
+ROIツリーの末端ノードを分析し、各ノードに適した解決策の種類と必要な情報を特定してください。
+
+各末端ノードに対して、以下の情報を提供してください:
+1. 想定される解決策のカテゴリ（例: システム導入、プロセス改善、人材育成など）
+2. ROI計算に必要な追加情報（例: 現在の工数、対象人数、発生頻度など）
+3. 優先度の判断基準（実装難易度、期待効果、緊急性など）
+
+レスポンスは以下のJSON形式で返してください:
+```json
+{{
+  "solution_suggestions": [
+    {{
+      "node_name": "ノード名",
+      "solution_categories": ["カテゴリ1", "カテゴリ2"],
+      "required_information": ["必要情報1", "必要情報2"],
+      "priority_criteria": ["基準1", "基準2"]
+    }}
+  ]
+}}
+```"""),
+            ("human", "以下のROIツリーの末端ノードに対する解決策の種類と必要な情報を特定してください：\n\n{mermaid_diagram}\n\n末端ノードのリスト：\n{leaf_nodes}")
         ])
     
     def create_roi_tree(self, challenge_text: str) -> Tuple[ROINode, str]:
@@ -167,6 +195,39 @@ Mermaid記法でROIツリーを表現してください。数値目標がわか�
                 incomplete_nodes=[],
                 completion_percentage=50.0
             )
+    
+    def suggest_solutions(self, root_node: ROINode, mermaid_diagram: str) -> Dict[str, Any]:
+        """
+        Suggest solutions for leaf nodes
+        
+        Args:
+            root_node: ROI tree root node
+            mermaid_diagram: Mermaid diagram of the ROI tree
+            
+        Returns:
+            Solution suggestions for leaf nodes
+        """
+        # Get all leaf nodes
+        leaf_nodes = get_leaf_nodes(root_node)
+        
+        # Format leaf nodes for the prompt
+        leaf_nodes_text = "\n".join([
+            f"- {node.name}" + (f" (値: {node.value})" if node.value is not None else " (値なし)")
+            for node in leaf_nodes
+        ])
+        
+        # Suggest solutions using LLM
+        messages = self.solution_prompt.format_messages(
+            mermaid_diagram=mermaid_diagram,
+            leaf_nodes=leaf_nodes_text
+        )
+        
+        response = self.reflection_llm.invoke(messages)
+        
+        # Extract JSON from response
+        solution_json = self._extract_json(response.content)
+        
+        return solution_json
     
     def _extract_mermaid(self, text: str) -> str:
         """Extract Mermaid diagram from text"""
