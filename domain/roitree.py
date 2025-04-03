@@ -1,4 +1,5 @@
 """
+domain/roitree.py
 Simplified ROI tree implementation for business analysis.
 """
 from typing import Dict, List, Optional, Any

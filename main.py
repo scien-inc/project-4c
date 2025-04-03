@@ -1,4 +1,5 @@
 """
+main.py
 Streamlit app for ROI Analysis with natural language understanding and real streaming
 """
 import streamlit as st
@@ -13,12 +14,14 @@ from typing import List, Dict, Tuple, Optional, Any, Callable
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, FunctionMessage
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
 
 from agents.deepdive_agent import ChallengeAgent
 from agents.proposal_agent import ProposalAgent
+from agents.solution_agent import SolutionAgent
+from agents.roi_chat_agent import ROIChatAgent
+from agents.conversion_agent import ConversionAgent
 from domain.roitree import ROINode, mermaid_to_roi_tree, get_leaf_nodes
+from domain.schemas import NumericalValue
 
 
 # Streamlitストリーミング出力のためのハンドラー
@@ -107,8 +110,12 @@ def has_numerical_value(node_label: str) -> bool:
     amount_pattern = r'(\d+[,\.]?\d*\s*[億万千]?円)'
     # パーセンテージのパターン（例: 25%, 3.5%）
     percentage_pattern = r'(\d+[,\.]?\d*\s*%)'
+    # 一般的な数値パターン（例: 100件, 50人）
+    general_pattern = r'(\d+[,\.]?\d*\s*[件人時分秒])'
     
-    return bool(re.search(amount_pattern, node_label)) or bool(re.search(percentage_pattern, node_label))
+    return bool(re.search(amount_pattern, node_label)) or \
+           bool(re.search(percentage_pattern, node_label)) or \
+           bool(re.search(general_pattern, node_label))
 
 
 def extract_nodes_without_values(mermaid_code):
@@ -176,247 +183,6 @@ def generate_node_question(nodes_without_values):
     ]
     
     return random.choice(questions)
-
-
-class NLUAgent:
-    """
-    自然言語理解を行い、ユーザーのメッセージからノード情報と数値を抽出するエージェント
-    """
-    def __init__(self, model_name="gpt-4o"):
-        self.llm = ChatOpenAI(
-            model=model_name,
-            temperature=0.1,
-            streaming=False  # 解析には素早いレスポンスが必要
-        )
-        
-        # 解析用のプロンプト
-        self.extract_prompt = ChatPromptTemplate.from_messages([
-            ("system", """あなたはROIツリー分析の専門家です。ユーザーの自然言語メッセージからノード名と数値情報を正確に抽出してください。
-
-以下のJSON形式で回答してください:
-```json
-{{
-  "found_node": true/false,  // ノード名が見つかったかどうか
-  "node_name": "抽出したノード名", // 見つかった場合のノード名
-  "found_value": true/false,  // 数値が見つかったかどうか
-  "value": "抽出した数値",     // 見つかった場合の数値（単位を含む）
-  "confidence": 0-100        // 抽出結果の確信度（0-100）
-}}
-```
-
-注意:
-- 数値は「円」「万円」「億円」「%」などの単位を含めて抽出してください
-- ノード名は完全一致でなくても、明らかに指しているノードがあれば抽出してください
-- 抽出できない場合は対応するフィールドをfalseにしてください
-- 確信度は抽出結果の信頼性を0-100で表してください
-"""),
-            ("human", """以下のユーザーメッセージから、ノード名と数値情報を抽出してください。
-
-ユーザーメッセージ: "{message}"
-
-利用可能なノード:
-{node_list}
-
-JSON形式で回答してください。
-""")
-        ])
-    
-    def extract_node_and_value(self, message: str, mermaid_diagram: str) -> Dict:
-        """ユーザーメッセージからノード名と数値を抽出する"""
-        # 利用可能なノードのリストを作成
-        leaf_nodes = extract_leaf_nodes(mermaid_diagram)
-        node_list = "\n".join([f"- {label}" for _, label in leaf_nodes])
-        
-        # LLMで解析
-        result = self.llm.invoke(
-            self.extract_prompt.format(
-                message=message,
-                node_list=node_list
-            )
-        )
-        
-        # JSONを抽出
-        try:
-            # 応答からJSON部分を抽出
-            pattern = r"```json\n(.*?)\n```"
-            matches = re.search(pattern, result.content, re.DOTALL)
-            
-            if matches:
-                json_str = matches.group(1)
-                extraction_result = json.loads(json_str)
-            else:
-                # JSONブロックがない場合、全体を解析
-                extraction_result = json.loads(result.content)
-            
-            # ノードIDの検索（抽出されたノード名に近いノードを検索）
-            node_id = None
-            if extraction_result.get("found_node", False) and extraction_result.get("node_name"):
-                node_name = extraction_result["node_name"]
-                
-                # ノード名が類似するノードを検索
-                for nid, label in leaf_nodes:
-                    # 簡易的な類似度チェック（部分文字列）
-                    if node_name.lower() in label.lower() or label.lower() in node_name.lower():
-                        node_id = nid
-                        extraction_result["matched_label"] = label
-                        break
-            
-            extraction_result["node_id"] = node_id
-            return extraction_result
-            
-        except Exception as e:
-            print(f"JSON解析エラー: {e}")
-            return {
-                "found_node": False,
-                "found_value": False,
-                "confidence": 0,
-                "error": str(e)
-            }
-    
-    def analyze_conversation(self, conversation_history: List, current_message: str, mermaid_diagram: str) -> Dict:
-        """会話の文脈を考慮してメッセージを分析する"""
-        # まず単純に現在のメッセージだけで分析
-        initial_result = self.extract_node_and_value(current_message, mermaid_diagram)
-        
-        # 高確信度の結果が得られた場合はそのまま返す
-        if initial_result.get("confidence", 0) > 80:
-            return initial_result
-        
-        # 低確信度の場合は、会話履歴も含めて再分析
-        recent_context = "\n".join([
-            f"{'ユーザー' if role == 'user' else 'アシスタント'}: {content}"
-            for role, content in conversation_history[-3:] if role in ['user', 'assistant']
-        ])
-        
-        context_prompt = ChatPromptTemplate.from_messages([
-            ("system", """あなたはROIツリー分析の専門家です。会話の文脈を考慮して、最新のユーザーメッセージからノード名と数値情報を抽出してください。
-
-以下のJSON形式で回答してください:
-```json
-{{
-  "found_node": true/false,
-  "node_name": "抽出したノード名",
-  "found_value": true/false,
-  "value": "抽出した数値",
-  "confidence": 0-100
-}}
-```"""),
-            ("human", """以下の会話の文脈を考慮して、最新のユーザーメッセージからノード名と数値情報を抽出してください。
-
-会話の文脈:
-{context}
-
-最新のメッセージ: "{message}"
-
-利用可能なノード:
-{node_list}
-
-JSON形式で回答してください。
-""")
-        ])
-        
-        # 利用可能なノードのリストを作成
-        leaf_nodes = extract_leaf_nodes(mermaid_diagram)
-        node_list = "\n".join([f"- {label}" for _, label in leaf_nodes])
-        
-        result = self.llm.invoke(
-            context_prompt.format(
-                context=recent_context,
-                message=current_message,
-                node_list=node_list
-            )
-        )
-        
-        try:
-            # 応答からJSON部分を抽出
-            pattern = r"```json\n(.*?)\n```"
-            matches = re.search(pattern, result.content, re.DOTALL)
-            
-            if matches:
-                json_str = matches.group(1)
-                context_result = json.loads(json_str)
-            else:
-                # JSONブロックがない場合、全体を解析
-                context_result = json.loads(result.content)
-            
-            # ノードIDの検索
-            node_id = None
-            if context_result.get("found_node", False) and context_result.get("node_name"):
-                node_name = context_result["node_name"]
-                
-                for nid, label in leaf_nodes:
-                    if node_name.lower() in label.lower() or label.lower() in node_name.lower():
-                        node_id = nid
-                        context_result["matched_label"] = label
-                        break
-            
-            context_result["node_id"] = node_id
-            return context_result
-            
-        except Exception as e:
-            print(f"文脈解析エラー: {e}")
-            return initial_result  # エラーの場合は最初の結果を返す
-
-
-class ROIChatAgent:
-    """
-    ROIツリーを対話的に構築するチャットエージェント
-    """
-    def __init__(self, model_name="gpt-4o"):
-        self.llm = ChatOpenAI(
-            model=model_name,
-            temperature=0.2,
-            streaming=True  # 実際のストリーミング
-        )
-        
-        self.nlu_agent = NLUAgent(model_name)
-        
-        # チャット用のプロンプト
-        self.chat_prompt = ChatPromptTemplate.from_messages([
-            ("system", """あなたはROIツリー分析のエキスパートです。ユーザーと対話しながら、ROIツリーの各ノードに適切な数値を設定し、ビジネス分析を支援します。
-
-現在のROIツリーには、まだ数値が設定されていないノードがあります。自然な会話の中で、こうしたノードに適切な数値を設定できるよう誘導してください。
-
-レスポンスでは以下を心がけてください：
-- 会話は親しみやすく自然な流れを保つ
-- 数値情報のリクエストは押し付けがましくならないよう配慮する
-- ユーザーが提供した情報を受け止め、適切なフィードバックを提供する
-- ROIツリーの構造や目的に関する質問にも答える
-- 一度に複数のノードの情報を求めないよう注意する
-
-以下のノードについての情報を対話的に収集してください：
-{nodes_without_values}
-"""),
-            ("human", "{user_message}")
-        ])
-    
-    def get_response(self, user_message: str, conversation_history: List, mermaid_diagram: str, callback=None):
-        """ユーザーメッセージに対する応答を生成する"""
-        # 数値が設定されていないノードを取得
-        nodes_without_values = extract_nodes_without_values(mermaid_diagram)
-        nodes_text = "\n".join([f"- {label}" for _, label in nodes_without_values])
-        
-        # LLMで応答を生成 （コールバック付きの場合はストリーミング）
-        if callback:
-            response = self.llm.with_config({"callbacks": [callback]}).invoke(
-                self.chat_prompt.format(
-                    nodes_without_values=nodes_text,
-                    user_message=user_message
-                )
-            )
-        else:
-            response = self.llm.invoke(
-                self.chat_prompt.format(
-                    nodes_without_values=nodes_text,
-                    user_message=user_message
-                )
-            )
-        
-        return response.content
-    
-    def analyze_message(self, message: str, conversation_history: List, mermaid_diagram: str) -> Dict:
-        """メッセージを分析し、ノード更新情報を抽出する"""
-        return self.nlu_agent.analyze_conversation(conversation_history, message, mermaid_diagram)
 
 
 def render_combined_trees(challenge_mermaid, proposal_mermaid, height=800):
@@ -499,7 +265,7 @@ def main():
         layout="wide"
     )
     
-    st.title("📊 ROIツリー分析ツール")
+    st.title("📊 ROIツリー分析と提案ソリューション")
     st.markdown("""
     このツールは、ビジネス課題をROIの観点から構造化し、分析・提案するためのツールです。
     テキストボックスにビジネス課題を入力して「分析開始」ボタンをクリックしてください。
@@ -524,7 +290,7 @@ def main():
             st.session_state.challenge_text = """ゴム製品メーカーでDX推進を担当しています。製造ラインの自動化により生産効率25%向上を目指し、年間1億円のコスト削減を狙っていますが、初期投資が大きいです。また、品質管理の自動化でクレームを減らして売上を伸ばしたいのですが、現場がAIに不安を抱えています。教育コストもかかりそうです。"""
     
     # タブで「課題分析」と「提案生成」を分ける
-    tab1, tab2 = st.tabs(["課題分析", "提案生成"])
+    tab1, tab2, tab3 = st.tabs(["1. 課題分析", "2. 提案生成", "3. ROI計算"])
     
     # タブ1: 課題分析
     with tab1:
@@ -545,8 +311,17 @@ def main():
         if "chat_active" not in st.session_state:
             st.session_state.chat_active = False
         
+        if "chat_focus" not in st.session_state:
+            st.session_state.chat_focus = "data_collection"
+        
         if "roi_chat_agent" not in st.session_state:
             st.session_state.roi_chat_agent = None
+        
+        if "prioritized_nodes" not in st.session_state:
+            st.session_state.prioritized_nodes = []
+        
+        if "conversion_info" not in st.session_state:
+            st.session_state.conversion_info = {}
         
         challenge_text = st.text_area(
             "ビジネス課題を入力してください",
@@ -566,6 +341,7 @@ def main():
                 st.session_state.mermaid_diagram = mermaid_diagram
                 st.session_state.root_node = root_node
                 st.session_state.challenge_agent = agent
+                st.session_state.challenge_text = challenge_text
                 
                 # ROIチャットエージェントを初期化
                 st.session_state.roi_chat_agent = ROIChatAgent(model_name=model_name)
@@ -574,10 +350,15 @@ def main():
                 analysis = agent.analyze_leaf_nodes(root_node, mermaid_diagram)
                 st.session_state.analysis = analysis
                 
+                # ソリューションの提案も準備
+                solution_suggestions = agent.suggest_solutions(root_node, mermaid_diagram)
+                st.session_state.solution_suggestions = solution_suggestions
+                
                 # チャット履歴をリセット
                 st.session_state.chat_history = []
                 st.session_state.mermaid_history = [mermaid_diagram]
                 st.session_state.chat_active = False
+                st.session_state.chat_focus = "data_collection"
         
         # 分析結果の表示
         if "mermaid_diagram" in st.session_state:
@@ -617,6 +398,12 @@ def main():
                     for node in analysis.missing_nodes:
                         st.markdown(f"- {node}")
                 
+                if analysis.incomplete_nodes:
+                    st.subheader("改善が必要なノード")
+                    for node in analysis.incomplete_nodes:
+                        st.markdown(f"- **{node['name']}**: {node['issue']}")
+                        st.markdown(f"  提案: {node['suggestion']}")
+                
                 # 数値サマリーを表示
                 st.subheader("数値サマリー")
                 
@@ -630,8 +417,24 @@ def main():
                         amount_pattern = r'(\d+[,\.]?\d*\s*[億万千]?円)'
                         amount_match = re.search(amount_pattern, node_label)
                         
+                        # パーセンテージのパターン
+                        percentage_pattern = r'(\d+[,\.]?\d*\s*%)'
+                        percentage_match = re.search(percentage_pattern, node_label)
+                        
+                        # 一般的な数値パターン
+                        general_pattern = r'(\d+[,\.]?\d*\s*[件人時分秒])'
+                        general_match = re.search(general_pattern, node_label)
+                        
+                        value = None
                         if amount_match:
-                            nodes_with_values.append((node_id, node_label, amount_match.group(1)))
+                            value = amount_match.group(1)
+                        elif percentage_match:
+                            value = percentage_match.group(1)
+                        elif general_match:
+                            value = general_match.group(1)
+                            
+                        if value:
+                            nodes_with_values.append((node_id, node_label, value))
                     
                     return nodes_with_values
                 
@@ -642,7 +445,9 @@ def main():
                 if nodes_with_values:
                     items = []
                     for _, node_label, value in nodes_with_values:
-                        items.append({"ノード": node_label.split(" (")[0], "値": value})
+                        # ノード名からカッコの部分を削除
+                        node_name = re.sub(r'\s*\([^)]+\)', '', node_label)
+                        items.append({"ノード": node_name, "値": value})
                     
                     st.dataframe(pd.DataFrame(items), use_container_width=True)
                 else:
@@ -667,8 +472,9 @@ def main():
                         initial_message = f"ROIツリーの分析を始めます。{len(nodes_without_values)}個のノードにはまだ数値が設定されていません。自由に会話をしながら、各ノードの数値目標を設定していきましょう。"
                         next_question = generate_node_question(nodes_without_values)
                     else:
-                        initial_message = "ROIツリーの分析を始めます。すべてのノードに数値が設定されています。何か詳しく知りたい点はありますか？"
-                        next_question = ""
+                        initial_message = "ROIツリーの分析を始めます。すべてのノードに数値が設定されています。次は優先的に解決したいノードを選びましょう。"
+                        next_question = "どのノードを優先的に解決したいですか？"
+                        st.session_state.chat_focus = "prioritization"
                     
                     # 初期メッセージをチャット履歴に追加
                     st.session_state.chat_history.append(("assistant", initial_message))
@@ -704,21 +510,107 @@ def main():
                     current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
                     current_root = mermaid_to_roi_tree(current_mermaid)
                     
-                    # メッセージを分析して数値情報を抽出
-                    analysis_result = st.session_state.roi_chat_agent.analyze_message(
-                        prompt, 
-                        st.session_state.chat_history,
-                        current_mermaid
-                    )
-                    
-                    # ツリーを更新すべきかどうかを判定
-                    should_update = (
-                        analysis_result.get("found_node", False) and 
-                        analysis_result.get("found_value", False) and 
-                        analysis_result.get("node_id") and 
-                        analysis_result.get("value") and
-                        analysis_result.get("confidence", 0) > 50  # 確信度が50%以上
-                    )
+                    # 現在のチャットフォーカスに応じた処理
+                    if st.session_state.chat_focus == "unit_conversion":
+                        # 単位変換の場合は変換情報を更新
+                        conversion_info = st.session_state.conversion_info
+                        
+                        # 単位変換エージェントで追加情報を解析
+                        conversion_agent = ConversionAgent(model_name=model_name)
+                        additional_info = prompt
+                        
+                        # 変換を実行
+                        conversion_result = conversion_agent.perform_conversion(
+                            conversion_info.get("value", 0),
+                            conversion_info.get("unit", ""),
+                            conversion_info.get("description", ""),
+                            additional_info
+                        )
+                        
+                        # 変換結果をセッションに保存
+                        st.session_state.conversion_result = conversion_result
+                        
+                        # 変換結果に基づいてノードを更新
+                        if conversion_result.get("converted_value") is not None:
+                            node_id = conversion_info.get("node_id")
+                            if node_id:
+                                new_value = f"{conversion_result.get('converted_value')}円"
+                                updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, new_value)
+                                st.session_state.mermaid_history.append(updated_mermaid)
+                        
+                        # チャットフォーカスを元に戻す
+                        st.session_state.chat_focus = "data_collection"
+                    elif st.session_state.chat_focus == "prioritization":
+                        # 優先ノードの選択の場合
+                        # メッセージを分析して優先ノードを特定
+                        # 簡易的な実装として、メッセージ内にノード名が含まれているか確認
+                        leaf_nodes = extract_leaf_nodes(current_mermaid)
+                        prioritized_nodes = []
+                        
+                        for node_id, node_label in leaf_nodes:
+                            # ノード名からカッコ部分を除去
+                            clean_label = re.sub(r'\s*\([^)]+\)', '', node_label)
+                            if clean_label.lower() in prompt.lower():
+                                prioritized_nodes.append({
+                                    "node_id": node_id,
+                                    "node_name": clean_label
+                                })
+                        
+                        # 優先ノードが見つかった場合は保存
+                        if prioritized_nodes:
+                            st.session_state.prioritized_nodes = prioritized_nodes
+                            priority_text = ", ".join([node["node_name"] for node in prioritized_nodes])
+                            st.session_state.priority_nodes_text = f"優先ノード: {priority_text}"
+                    else:
+                        # 通常のデータ収集モード
+                        # メッセージを分析して数値情報を抽出
+                        analysis_result = st.session_state.roi_chat_agent.analyze_message(
+                            prompt, 
+                            st.session_state.chat_history,
+                            current_mermaid
+                        )
+                        
+                        # 単位情報も分析
+                        unit_analysis = st.session_state.roi_chat_agent.analyze_unit_conversion(prompt)
+                        
+                        # ツリーを更新すべきかどうかを判定
+                        should_update = (
+                            analysis_result.get("found_node", False) and 
+                            analysis_result.get("found_value", False) and 
+                            analysis_result.get("node_id") and 
+                            analysis_result.get("value") and
+                            analysis_result.get("confidence", 0) > 50  # 確信度が50%以上
+                        )
+                        
+                        # 単位変換が必要かチェック
+                        needs_conversion = (
+                            unit_analysis.get("found_value", False) and
+                            unit_analysis.get("needs_conversion", False) and
+                            len(unit_analysis.get("additional_info_needed", [])) > 0
+                        )
+                        
+                        if needs_conversion and should_update:
+                            # 単位変換に必要な情報を保存
+                            conversion_info = {
+                                "node_id": analysis_result.get("node_id"),
+                                "node_name": analysis_result.get("node_name"),
+                                "value": unit_analysis.get("value"),
+                                "unit": unit_analysis.get("value_unit"),
+                                "description": analysis_result.get("matched_label", ""),
+                                "required_info": unit_analysis.get("additional_info_needed", [])
+                            }
+                            st.session_state.conversion_info = conversion_info
+                            
+                            # チャットフォーカスを単位変換に変更
+                            st.session_state.chat_focus = "unit_conversion"
+                        elif should_update:
+                            # 単位変換が不要な場合は直接更新
+                            node_id = analysis_result["node_id"]
+                            value = analysis_result["value"]
+                            
+                            # ノードの値を更新
+                            updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, value)
+                            st.session_state.mermaid_history.append(updated_mermaid)
                     
                     # 実際のレスポンスを生成（LLMストリーミング）
                     with st.chat_message("assistant"):
@@ -730,37 +622,23 @@ def main():
                             prompt,
                             st.session_state.chat_history,
                             current_mermaid,
+                            current_focus=st.session_state.chat_focus,
                             callback=stream_handler
                         )
                     
                     # チャット履歴に追加
                     st.session_state.chat_history.append(("assistant", response))
                     
-                    # ROIツリーを更新する必要がある場合
-                    updated_mermaid = current_mermaid
-                    if should_update:
-                        node_id = analysis_result["node_id"]
-                        value = analysis_result["value"]
+                    # すべてのノードにデータが揃ったかチェック
+                    if st.session_state.chat_focus == "data_collection":
+                        # 最新のMermaidを取得
+                        latest_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else current_mermaid
+                        nodes_without_values = extract_nodes_without_values(latest_mermaid)
                         
-                        # ノードの値を更新
-                        updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, value)
-                        updated_root = mermaid_to_roi_tree(updated_mermaid)
-                        
-                        # 更新を保存
-                        st.session_state.mermaid_history.append(updated_mermaid)
-                        
-                        # 更新されたROIツリーを表示
-                        st.caption("ROIツリーが更新されました：")
-                        render_mermaid(updated_mermaid)
-                        
-                        # 再分析を実行
-                        if "challenge_agent" in st.session_state:
-                            updated_analysis = st.session_state.challenge_agent.analyze_leaf_nodes(
-                                updated_root, updated_mermaid
-                            )
-                            st.session_state.analysis = updated_analysis
-                    
-                    # 次の質問（自動生成）は次のユーザー入力を待つ
+                        # データが揃ったら優先ノード選択へ
+                        if not nodes_without_values and not st.session_state.prioritized_nodes:
+                            st.session_state.chat_focus = "prioritization"
+                            st.session_state.chat_history.append(("assistant", "すべてのノードに数値が設定されました。次は、優先的に解決したいノードを教えていただけますか？"))
                     
                     # ページをリロードして最新の状態を表示
                     st.rerun()
@@ -777,6 +655,10 @@ def main():
         if "mermaid_diagram" not in st.session_state and not st.session_state.mermaid_history:
             st.warning("最初に「課題分析」タブで課題ツリーを生成してください。")
         else:
+            # 優先ノードの表示
+            if st.session_state.prioritized_nodes:
+                st.success("選択された優先ノード: " + ", ".join([node["node_name"] for node in st.session_state.prioritized_nodes]))
+            
             # 提案の方向性を入力するテキストエリア
             if "proposal_guidance_text" not in st.session_state:
                 st.session_state.proposal_guidance_text = ""
@@ -804,6 +686,11 @@ def main():
             # 現在のROIツリーを取得（更新履歴がある場合は最新のものを使用）
             current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
             
+            # 優先ノードをテキスト形式に変換
+            priority_nodes_text = ""
+            if st.session_state.prioritized_nodes:
+                priority_nodes_text = "\n".join([f"- {node['node_name']}" for node in st.session_state.prioritized_nodes])
+            
             # 提案生成ボタン
             if st.button("提案を生成", type="primary"):
                 with st.spinner("提案を生成中..."):
@@ -827,6 +714,7 @@ def main():
                     proposal_text, summary = proposal_agent.generate_proposal_streaming(
                         current_mermaid,
                         proposal_guidance,
+                        priority_nodes=priority_nodes_text,
                         callback=stream_handler
                     )
                     
@@ -834,6 +722,18 @@ def main():
                     st.session_state.proposal_text = proposal_text
                     st.session_state.proposal_summary = summary
                     st.session_state.proposal_guidance_text = proposal_guidance
+                    
+                    # ソリューション推薦エージェントも実行
+                    solution_agent = SolutionAgent(model_name=model_name)
+                    leaf_nodes_text = "\n".join([f"- {label}" for _, label in extract_leaf_nodes(current_mermaid)])
+                    
+                    solution_recommendations = solution_agent.recommend_solutions(
+                        leaf_nodes_text,
+                        priority_nodes_text,
+                        proposal_guidance
+                    )
+                    
+                    st.session_state.solution_recommendations = solution_recommendations
             
             # 提案結果の表示
             if "proposal_text" in st.session_state:
@@ -872,7 +772,7 @@ def main():
                         proposal_mermaid = None
                 
                 # 提案ツリーと提案サマリーを表示するためのタブ
-                prop_tab1, prop_tab2, prop_tab3 = st.tabs(["統合ビュー", "提案ツリー", "提案サマリー"])
+                prop_tab1, prop_tab2, prop_tab3, prop_tab4 = st.tabs(["統合ビュー", "提案ツリー", "提案サマリー", "具体的ソリューション"])
                 
                 with prop_tab1:
                     st.subheader("課題と提案の統合ビュー")
@@ -926,6 +826,178 @@ def main():
                     st.subheader("主要提案ポイント")
                     for i, point in enumerate(summary.key_recommendations, 1):
                         st.markdown(f"{i}. {point}")
+                    
+                    # 優先度ランキングがあれば表示
+                    if summary.priority_ranking:
+                        st.subheader("提案の優先度ランキング")
+                        ranking_df = pd.DataFrame(summary.priority_ranking)
+                        st.dataframe(ranking_df, use_container_width=True)
+                
+                with prop_tab4:
+                    st.subheader("具体的なソリューション提案")
+                    
+                    if "solution_recommendations" in st.session_state:
+                        recommendations = st.session_state.solution_recommendations.get("solution_recommendations", [])
+                        
+                        if recommendations:
+                            # 優先度でソート
+                            sorted_recommendations = sorted(recommendations, key=lambda x: x.get("priority", 999))
+                            
+                            for i, rec in enumerate(sorted_recommendations):
+                                with st.expander(f"#{rec.get('priority', i+1)} {rec.get('solution_name', 'ソリューション')}"):
+                                    st.markdown(f"**ノード**: {rec.get('leaf_node_name', '不明')}")
+                                    st.markdown(f"**説明**: {rec.get('solution_description', '説明なし')}")
+                                    
+                                    est_cost = rec.get('estimated_cost', {})
+                                    est_benefit = rec.get('estimated_benefit', {})
+                                    
+                                    col1, col2, col3 = st.columns(3)
+                                    with col1:
+                                        st.markdown(f"**実装コスト**: {est_cost.get('value', '不明')} {est_cost.get('unit', '')}")
+                                    with col2:
+                                        st.markdown(f"**期待効果**: {est_benefit.get('value', '不明')} {est_benefit.get('unit', '')}")
+                                    with col3:
+                                        st.markdown(f"**実装期間**: {rec.get('implementation_timeframe', '不明')}")
+                        else:
+                            st.info("具体的なソリューション提案は生成されていません。")
+                    else:
+                        st.info("具体的なソリューション提案は生成されていません。")
+    
+    # タブ3: ROI計算
+    with tab3:
+        st.header("ROI計算")
+        st.markdown("提案に基づいたROI（投資対効果）の詳細計算を行います。")
+        
+        if "proposal_summary" not in st.session_state:
+            st.warning("「提案生成」タブで提案を生成してからROI計算を行ってください。")
+        else:
+            summary = st.session_state.proposal_summary
+            
+            # ROI計算の詳細表示
+            st.subheader("ROI計算シミュレーション")
+            
+            # 期間選択
+            years = st.slider("計算期間（年）", 1, 5, 3)
+            
+            # コストと効果の分布
+            cost_front_loaded = st.slider("コスト前倒し度", 0.0, 1.0, 0.7, 
+                                        help="1.0に近いほど初期コストが大きく、後年は小さくなります")
+            benefit_delay = st.slider("効果発現の遅延度", 0.0, 1.0, 0.3,
+                                    help="1.0に近いほど効果の発現が遅れます")
+            
+            # 年ごとのシミュレーション計算
+            yearly_data = []
+            total_cost = summary.total_investment
+            total_benefit = summary.total_benefit
+            
+            for year in range(1, years + 1):
+                # コスト計算（前倒し）
+                year_progress = year / years
+                if cost_front_loaded > 0:
+                    # 指数関数的減少
+                    cost_factor = (1 - year_progress) ** (cost_front_loaded * 3)
+                    yearly_cost = total_cost * cost_factor / sum([(1 - y/years) ** (cost_front_loaded * 3) for y in range(1, years + 1)])
+                else:
+                    # 均等配分
+                    yearly_cost = total_cost / years
+                
+                # 効果計算（徐々に増加）
+                if benefit_delay > 0:
+                    # 指数関数的増加
+                    benefit_factor = year_progress ** (benefit_delay * 3)
+                    yearly_benefit = total_benefit * benefit_factor / sum([(y/years) ** (benefit_delay * 3) for y in range(1, years + 1)])
+                else:
+                    # 均等配分
+                    yearly_benefit = total_benefit / years
+                
+                # 年間ROI
+                yearly_roi = (yearly_benefit - yearly_cost) / yearly_cost * 100 if yearly_cost > 0 else 0
+                
+                yearly_data.append({
+                    "年": year,
+                    "コスト": yearly_cost,
+                    "効果": yearly_benefit,
+                    "利益": yearly_benefit - yearly_cost,
+                    "ROI": yearly_roi
+                })
+            
+            # 累積データの計算
+            cumulative_data = []
+            cum_cost = 0
+            cum_benefit = 0
+            
+            for year_data in yearly_data:
+                cum_cost += year_data["コスト"]
+                cum_benefit += year_data["効果"]
+                cum_roi = (cum_benefit - cum_cost) / cum_cost * 100 if cum_cost > 0 else 0
+                
+                cumulative_data.append({
+                    "年": year_data["年"],
+                    "累積コスト": cum_cost,
+                    "累積効果": cum_benefit,
+                    "累積利益": cum_benefit - cum_cost,
+                    "累積ROI": cum_roi
+                })
+            
+            # データ表示
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("年間ROI推移")
+                yearly_df = pd.DataFrame(yearly_data)
+                st.dataframe(yearly_df.style.format({
+                    "コスト": "{:,.0f}円",
+                    "効果": "{:,.0f}円",
+                    "利益": "{:,.0f}円",
+                    "ROI": "{:.1f}%"
+                }), use_container_width=True)
+            
+            with col2:
+                st.subheader("累積ROI推移")
+                cumulative_df = pd.DataFrame(cumulative_data)
+                st.dataframe(cumulative_df.style.format({
+                    "累積コスト": "{:,.0f}円",
+                    "累積効果": "{:,.0f}円",
+                    "累積利益": "{:,.0f}円",
+                    "累積ROI": "{:.1f}%"
+                }), use_container_width=True)
+            
+            # 損益分岐点の計算
+            breakeven_year = None
+            for i, data in enumerate(cumulative_data):
+                if data["累積利益"] >= 0:
+                    if i > 0:
+                        # 線形補間で月単位の損益分岐点を計算
+                        prev_profit = cumulative_data[i-1]["累積利益"]
+                        curr_profit = data["累積利益"]
+                        prev_year = cumulative_data[i-1]["年"]
+                        
+                        # 損益がゼロになる比率を計算
+                        if curr_profit - prev_profit != 0:  # ゼロ除算防止
+                            ratio = -prev_profit / (curr_profit - prev_profit)
+                            breakeven_year = prev_year + ratio
+                        else:
+                            breakeven_year = data["年"]
+                    else:
+                        breakeven_year = data["年"]
+                    break
+            
+            # 損益分岐点の表示
+            st.subheader("ROI分析結果")
+            if breakeven_year:
+                years_part = int(breakeven_year)
+                months_part = int((breakeven_year - years_part) * 12)
+                st.success(f"損益分岐点: {years_part}年{months_part}ヶ月")
+            else:
+                st.warning(f"設定した{years}年間では損益分岐点に達しません")
+            
+            # 最終年のROI
+            final_roi = cumulative_data[-1]["累積ROI"]
+            st.metric(f"{years}年後の累積ROI", f"{final_roi:.1f}%")
+            
+            # ROIが最大になる年
+            max_roi_year = max(yearly_data, key=lambda x: x["ROI"])
+            st.info(f"年間ROIが最大になるのは {max_roi_year['年']}年目 ({max_roi_year['ROI']:.1f}%)")
 
 
 if __name__ == "__main__":
