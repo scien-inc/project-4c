@@ -1,6 +1,6 @@
 """
 agents/conversion_agent.py
-Unit conversion agent for ROI calculations
+Unit conversion agent for ROI calculations with self-reflection
 """
 from typing import Dict, List, Tuple, Optional, Any
 import json
@@ -14,7 +14,7 @@ from domain.schemas import NumericalValue, UnitConversion
 
 
 class ConversionAgent:
-    """Agent for converting between different units for ROI calculation"""
+    """Agent for converting between different units for ROI calculation with self-reflection capabilities"""
     
     def __init__(self, model_name: str = "gpt-4o"):
         """
@@ -96,6 +96,50 @@ JSON形式で回答してください。
 この情報をもとに、数値を金額（円）に変換してください。
 """)
         ])
+        
+        # 新規: セルフリフレクション用のプロンプトを追加
+        self.reflection_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたは単位変換の専門家であり、自己評価能力に優れています。
+実施した単位変換の品質と正確性を評価し、必要に応じて改善点を提案してください。
+
+以下の点について評価してください:
+1. 変換の正確性 - 数学的に正しいか
+2. 前提条件の妥当性 - 仮定が合理的か
+3. 代替手法の有無 - より良い変換方法はあるか
+4. 不確実性の度合い - 変換にどの程度の確信があるか
+5. エッジケースの考慮 - 特殊なケースへの対応
+
+レスポンスは以下のJSON形式で返してください:
+```json
+{
+  "conversion_quality": 0-100,
+  "confidence": 0-100,
+  "strengths": ["強み1", "強み2"],
+  "weaknesses": ["弱点1", "弱点2"],
+  "improvement_suggestions": ["改善案1", "改善案2"],
+  "needs_reconsideration": true/false,
+  "alternative_conversion": {
+    "factor": 数値 または null,
+    "formula": "代替計算式",
+    "explanation": "代替案の説明"
+  }
+}
+```"""),
+            ("human", """以下の単位変換結果を評価してください：
+
+元の数値: {{value}}
+元の単位: {{unit}}
+説明: {{description}}
+
+追加情報:
+{{additional_info}}
+
+変換結果:
+{{conversion_result}}
+
+この変換の品質、正確性、改善点を評価してJSON形式で回答してください。
+""")
+        ])
     
     def analyze_conversion_needs(self, value: float, unit: str, description: str = "", additional_info: str = "") -> Dict[str, Any]:
         """
@@ -155,7 +199,7 @@ JSON形式で回答してください。
     
     def perform_conversion(self, value: float, unit: str, description: str = "", additional_info: str = "", conversion_info: str = "") -> Dict[str, Any]:
         """
-        Perform unit conversion based on provided information
+        Perform unit conversion based on provided information with self-reflection
         
         Args:
             value: Numerical value
@@ -165,11 +209,11 @@ JSON形式で回答してください。
             conversion_info: Information about conversion factor or formula
             
         Returns:
-            Conversion result
+            Conversion result with self-reflection
         """
         # For simple monetary conversions, handle directly
         if unit == "万円":
-            return {
+            conversion_result = {
                 "original_value": value,
                 "original_unit": unit,
                 "converted_value": value * 10000,
@@ -179,7 +223,7 @@ JSON形式で回答してください。
                 "explanation": "万円から円への変換"
             }
         elif unit == "億円":
-            return {
+            conversion_result = {
                 "original_value": value,
                 "original_unit": unit,
                 "converted_value": value * 100000000,
@@ -189,7 +233,7 @@ JSON形式で回答してください。
                 "explanation": "億円から円への変換"
             }
         elif unit == "円":
-            return {
+            conversion_result = {
                 "original_value": value,
                 "original_unit": unit,
                 "converted_value": value,
@@ -198,22 +242,105 @@ JSON形式で回答してください。
                 "calculation": f"{value}",
                 "explanation": "すでに円単位のため変換不要"
             }
+        else:
+            # For other conversions, use LLM
+            messages = self.perform_conversion_prompt.format_messages(
+                value=value,
+                unit=unit,
+                description=description,
+                additional_info=additional_info,
+                conversion_info=conversion_info
+            )
+            
+            response = self.llm.invoke(messages)
+            
+            # Extract JSON from response
+            conversion_result = self._extract_json(response.content)
         
-        # For other conversions, use LLM
-        messages = self.perform_conversion_prompt.format_messages(
+        # 新規: セルフリフレクションを実行
+        reflection_result = self.self_reflect(value, unit, description, additional_info, conversion_result)
+        
+        # 新規: リフレクションの結果、再考が必要な場合は代替変換を採用
+        if reflection_result.get("needs_reconsideration", False) and reflection_result.get("alternative_conversion"):
+            alternative = reflection_result.get("alternative_conversion", {})
+            
+            if "factor" in alternative and alternative["factor"] is not None:
+                # 代替変換を適用
+                if unit == "%" and "割合" in description.lower():
+                    # 特殊ケース: パーセンテージの変換の場合
+                    try:
+                        new_value = float(value) * alternative.get("factor", 1)
+                        conversion_result["converted_value"] = new_value
+                        conversion_result["conversion_factor"] = alternative.get("factor")
+                        conversion_result["calculation"] = alternative.get("formula", f"{value} × {alternative.get('factor')} = {new_value}")
+                        conversion_result["explanation"] = alternative.get("explanation", "リフレクションに基づく変換")
+                    except (ValueError, TypeError):
+                        # 数値変換エラーの場合は元の結果を使用
+                        pass
+                else:
+                    # 通常の変換
+                    try:
+                        new_value = float(value) * alternative.get("factor", 1)
+                        conversion_result["converted_value"] = new_value
+                        conversion_result["conversion_factor"] = alternative.get("factor")
+                        conversion_result["calculation"] = alternative.get("formula", f"{value} × {alternative.get('factor')} = {new_value}")
+                        conversion_result["explanation"] = alternative.get("explanation", "リフレクションに基づく変換")
+                    except (ValueError, TypeError):
+                        # 数値変換エラーの場合は元の結果を使用
+                        pass
+        
+        # リフレクション結果を追加
+        conversion_result["reflection"] = {
+            "quality": reflection_result.get("conversion_quality", 0),
+            "confidence": reflection_result.get("confidence", 0),
+            "strengths": reflection_result.get("strengths", []),
+            "weaknesses": reflection_result.get("weaknesses", []),
+            "improvement_suggestions": reflection_result.get("improvement_suggestions", [])
+        }
+        
+        return conversion_result
+    
+    # 新規: セルフリフレクション機能
+    def self_reflect(self, value: float, unit: str, description: str, additional_info: str, conversion_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Perform self-reflection on a conversion result
+        
+        Args:
+            value: Original numerical value
+            unit: Unit of the original value
+            description: Description of the value
+            additional_info: Additional information used for conversion
+            conversion_result: Result of the conversion
+            
+        Returns:
+            Self-reflection on the conversion quality
+        """
+        # Simple unit conversions don't need complex reflection
+        if unit in ["円", "万円", "億円"]:
+            return {
+                "conversion_quality": 100,
+                "confidence": 100,
+                "strengths": ["標準的な単位変換", "確実な変換係数"],
+                "weaknesses": [],
+                "improvement_suggestions": [],
+                "needs_reconsideration": False
+            }
+        
+        # For complex conversions, use LLM for reflection
+        messages = self.reflection_prompt.format_messages(
             value=value,
             unit=unit,
             description=description,
             additional_info=additional_info,
-            conversion_info=conversion_info
+            conversion_result=json.dumps(conversion_result, ensure_ascii=False, indent=2)
         )
         
         response = self.llm.invoke(messages)
         
         # Extract JSON from response
-        conversion_json = self._extract_json(response.content)
+        reflection_json = self._extract_json(response.content)
         
-        return conversion_json
+        return reflection_json
     
     def get_conversion_questions(self, value: float, unit: str, description: str = "") -> List[str]:
         """

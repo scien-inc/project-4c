@@ -18,16 +18,16 @@ from domain.roitree import ROINode, get_leaf_nodes, mermaid_to_roi_tree
 PROPOSAL_SYSTEM_PROMPT = """# ROI Proposal Expert
 
 あなたはビジネス提案の専門エージェントです。
-ユーザーから与えられた「課題ツリー」(Mermaid記法)をもとに、それぞれの末端ノードに対して1対1の提案を生成してください。
+ユーザーから与えられた「課題ツリー」(Mermaid記法)をもとに、指定された末端ノードに対して提案を生成してください。
 
 ## 提案生成の条件:
-- 課題の末端ノードそれぞれに対し、具体的な打ち手・ソリューションを1つずつ提案する
-- 提案の粒度は1ノード＝1ソリューションで、現実的かつ具体的な内容とする
-- 各提案には予想される実装コストを設定する
-- 各提案には期待される効果（金額または数値）を設定する
-- 各提案には実装期間の目安を設定する
-- 各提案には優先度（1＝最高、5＝最低）を設定する
-- 最後に「投資コスト」と「期待効果」を合計し、最終的なROIを試算する
+- 指定された課題の末端ノードに対し、具体的な打ち手・ソリューションを提案する
+- 提案は現実的かつ具体的な内容とする
+- 提案には予想される実装コストを設定する
+- 提案には期待される効果（金額または数値）を設定する
+- 提案には実装期間の目安を設定する
+- 提案には優先度（1＝最高、5＝最低）を設定する
+- 「投資コスト」と「期待効果」から、ROIを試算する
 - ROIは「(期待効果-投資コスト)/投資コスト×100%」の式で計算する
 
 ## 出力形式:
@@ -37,15 +37,12 @@ PROPOSAL_SYSTEM_PROMPT = """# ROI Proposal Expert
 - 具体的な書式例:
 ```
 flowchart BT
-    P_A["提案A (コスト:500万円/効果:1000万円/優先度:1)"]
-    P_B["提案B (コスト:300万円/効果:800万円/優先度:2)"]
-    P_ROI["ROI: 120%"]
+    P_A["提案A (コスト:500万円/効果:1000万円/優先度:1/ROI:100%)"]
+    P_ROI["最終ROI: 100%"]
     P_A --> P_ROI
-    P_B --> P_ROI
 ```
 - ROIを頂点ノードに配置し、その下に提案ノードを配置する
-- 各提案ノードには、具体的な名前とコスト情報と効果予測を含める
-- 末端ノードの提案は課題の末端ノードと1対1対応になるようにする
+- 提案ノードには、具体的な名前とコスト情報と効果予測、ROIを含める
 - 提案ノードのIDには「P_」というプレフィックスをつける（例: P_A, P_B）
 
 ## 提案内容には以下の要素を含めてください:
@@ -53,12 +50,63 @@ flowchart BT
 2. 実装に必要なコスト
 3. 期待される効果（可能な限り数値化）
 4. 実装期間の目安
-5. 優先度とその理由
+5. ROI値
+6. 優先度とその理由
 
-## 優先付けの考え方:
-- 実装が容易で効果が大きいものを優先度1に
-- コストパフォーマンスが高いものを優先
-- ユーザーが指定した優先事項があればそれを最優先
+## ROIの計算方法:
+- 各提案ノードでは「(期待効果-投資コスト)/投資コスト×100%」でROIを計算する
+- コストと効果は同じ単位（通常は円）で計算すること
+"""
+
+
+# Single node proposal system prompt
+SINGLE_NODE_PROPOSAL_PROMPT = """# 特定末端ノードのROI提案エキスパート
+
+あなたはビジネス提案の専門エージェントです。
+ユーザーから与えられた「課題ツリー」(Mermaid記法)の中から、指定された特定の末端ノードに対してのみ提案を生成してください。
+
+## 提案生成の条件:
+- 指定された課題の末端ノードに対し、具体的な打ち手・ソリューションを提案する
+- 複数の代替案（最大3つ）を提示し、それぞれにROIを計算する
+- 各提案は現実的かつ具体的な内容とする
+- 各提案には予想される実装コストを設定する
+- 各提案には期待される効果（金額または数値）を設定する
+- 各提案には実装期間の目安を設定する
+- 各提案には優先度（1＝最高、5＝最低）を設定する
+- 「投資コスト」と「期待効果」から、ROIを試算する
+- ROIは「(期待効果-投資コスト)/投資コスト×100%」の式で計算する
+
+## 出力形式:
+- 提案ツリーはMermaid記法で表現し、必ず「flowchart BT」で始めること
+- 各ノード定義は独立した行に記述すること
+- 各エッジ（接続）も独立した行に記述すること
+- 具体的な書式例:
+```
+flowchart BT
+    P_A["提案A (コスト:500万円/効果:1000万円/優先度:1/ROI:100%)"]
+    P_B["提案B (コスト:300万円/効果:800万円/優先度:2/ROI:167%)"]
+    P_C["提案C (コスト:100万円/効果:200万円/優先度:3/ROI:100%)"]
+    P_ROI["最適ROI: 167% (提案B)"]
+    P_A --> P_ROI
+    P_B --> P_ROI
+    P_C --> P_ROI
+```
+- 最適なROIを頂点ノードに配置し、その下に提案ノードを配置する
+- 各提案ノードには、具体的な名前とコスト情報と効果予測、ROIを含める
+- 提案ノードのIDには「P_」というプレフィックスをつける（例: P_A, P_B）
+
+## 提案内容には以下の要素を含めてください:
+1. 具体的なソリューション名
+2. 実装に必要なコスト
+3. 期待される効果（可能な限り数値化）
+4. 実装期間の目安
+5. ROI値
+6. 優先度とその理由
+
+## ROIの計算方法:
+- 各提案ノードでは「(期待効果-投資コスト)/投資コスト×100%」でROIを計算する
+- コストと効果は同じ単位（通常は円）で計算すること
+- 最も高いROIを持つ提案を「最適ROI」として頂点ノードに表示する
 """
 
 
@@ -102,6 +150,7 @@ class ProposalAgent:
 2. 実装コスト
 3. 期待効果
 4. 優先度（1〜5）
+5. ROI値（%）
 
 また、各提案の詳細について、以下の形式で補足説明を加えてください:
 【提案名】: 提案の詳細説明
@@ -109,6 +158,42 @@ class ProposalAgent:
 - 優先度: x（理由: xxxx）
 - 実施内容: xxxxxx
 - 期待効果: xxxxx
+- ROI: xx%
+- 必要な資源: xxxxx
+""")
+        ])
+        
+        # 新規: 単一ノード用の提案プロンプト
+        self.single_node_proposal_prompt = ChatPromptTemplate.from_messages([
+            ("system", SINGLE_NODE_PROPOSAL_PROMPT),
+            ("human", """以下のMermaid記法で表された課題ツリーの中から、特定の末端ノードに対してROIを最大化する提案を生成してください。
+
+【課題ツリー】
+{mermaid_diagram}
+
+【対象とする末端ノード】
+{target_node}
+
+【提案の方向性（任意）】
+{proposal_guidance}
+
+対象の末端ノードに対して、ROIを最大化する複数の提案（最大3つ）を生成し、それぞれのROIを計算してください。
+すべての提案をツリー（flowchart BT）として表現し、最も高いROIを持つ提案を頂点ノードに配置してください。
+
+各提案には以下の要素を含めてください:
+1. 具体的なソリューション名
+2. 実装に必要なコスト
+3. 期待される効果（数値化）
+4. ROI値（%）
+5. 優先度（1〜5）
+
+また、各提案の詳細について、以下の形式で補足説明を加えてください:
+【提案名】: 提案の詳細説明
+- 実装期間: xx週間/xx月
+- 優先度: x（理由: xxxx）
+- 実施内容: xxxxxx
+- 期待効果: xxxxx
+- ROI: xx%
 - 必要な資源: xxxxx
 """)
         ])
@@ -176,13 +261,52 @@ JSON形式で回答してください。
   "implementation_timeframe": "期間の説明",
   "key_recommendations": ["提案1", "提案2", "提案3"],
   "priority_ranking": [
-    {{"proposal": "提案名", "priority": 優先度, "cost": コスト, "benefit": 効果}}
+    {{"proposal": "提案名", "priority": 優先度, "cost": コスト, "benefit": 効果, "roi": ROI}}
   ]
 }}
 ```"""),
             ("human", """以下の提案ツリーとROI試算から、主要情報を抽出してください：
 
 【提案ツリーと試算】
+{proposal_text}
+""")
+        ])
+        
+        # 新規: 単一ノード提案の要約プロンプト
+        self.single_node_summary_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたはROI提案の分析専門家です。特定の末端ノードに対する提案から、主要な情報を抽出してください。
+
+以下の情報を抽出し、JSON形式で返してください:
+1. 対象ノード名
+2. 最適提案の名前
+3. 最適提案の投資額（円）
+4. 最適提案の期待効果額（円）
+5. 最適提案のROI率（%）
+6. 実装期間の目安
+7. 提案の詳細ポイント（最大3つ）
+8. 代替提案のリスト（各提案の名前、コスト、効果、ROIを含む）
+
+レスポンスは以下のJSON形式で返してください:
+```json
+{{
+  "target_node": "対象ノード名",
+  "best_proposal": "最適提案名",
+  "investment": 数値,
+  "benefit": 数値,
+  "roi_percentage": 数値,
+  "implementation_timeframe": "期間の説明",
+  "key_points": ["要点1", "要点2", "要点3"],
+  "alternative_proposals": [
+    {{"name": "代替提案名", "cost": コスト, "benefit": 効果, "roi": ROI}}
+  ]
+}}
+```"""),
+            ("human", """以下の特定ノードに対する提案から、主要情報を抽出してください：
+
+【対象ノード】
+{target_node}
+
+【提案内容】
 {proposal_text}
 """)
         ])
@@ -211,6 +335,41 @@ JSON形式で回答してください。
         
         # Extract summary information
         summary = self.extract_summary(proposal_text)
+        
+        return proposal_text, summary
+    
+    # 新規: 単一ノードに対する提案生成メソッド
+    def generate_single_node_proposal(self, challenge_tree_mermaid: str, target_node: str, proposal_guidance: str = "", callback=None) -> Tuple[str, ProposalResult]:
+        """
+        Generate a proposal for a specific leaf node
+        
+        Args:
+            challenge_tree_mermaid: Mermaid diagram of the challenge tree
+            target_node: The specific leaf node to focus on
+            proposal_guidance: Optional guidance for proposal generation
+            callback: Optional streaming callback
+            
+        Returns:
+            Tuple of (proposal text, proposal summary)
+        """
+        # Generate proposal using LLM
+        messages = self.single_node_proposal_prompt.format_messages(
+            mermaid_diagram=challenge_tree_mermaid,
+            target_node=target_node,
+            proposal_guidance=proposal_guidance
+        )
+        
+        if callback:
+            # ストリーミングコールバックを使用
+            response = self.llm.with_config({"callbacks": [callback]}).invoke(messages)
+        else:
+            # 通常の呼び出し
+            response = self.llm.invoke(messages)
+            
+        proposal_text = response.content
+        
+        # Extract summary information for single node proposal
+        summary = self.extract_single_node_summary(proposal_text, target_node)
         
         return proposal_text, summary
     
@@ -296,6 +455,68 @@ JSON形式で回答してください。
             return ProposalResult(**summary_json)
         except Exception as e:
             print(f"Error parsing proposal summary: {str(e)}")
+            # Return default summary if parsing fails
+            return ProposalResult(
+                total_investment=0,
+                total_benefit=0,
+                roi_percentage=0,
+                implementation_timeframe="不明",
+                key_recommendations=["情報抽出に失敗しました"]
+            )
+    
+    # 新規: 単一ノード提案の要約抽出
+    def extract_single_node_summary(self, proposal_text: str, target_node: str) -> ProposalResult:
+        """
+        Extract summary information from single node proposal text
+        
+        Args:
+            proposal_text: Text of the proposal
+            target_node: The target node for the proposal
+            
+        Returns:
+            Summary of the proposal
+        """
+        # Extract summary using LLM
+        messages = self.single_node_summary_prompt.format_messages(
+            target_node=target_node,
+            proposal_text=proposal_text
+        )
+        
+        response = self.llm.invoke(messages)
+        
+        # Extract JSON from response
+        summary_json = self._extract_json(response.content)
+        
+        try:
+            # 単一ノード提案の要約結果をProposalResultに変換
+            # (ここでは構造が異なるので変換処理が必要)
+            best_proposal = summary_json.get("best_proposal", "")
+            
+            # ProposalResult形式に変換
+            result = ProposalResult(
+                total_investment=summary_json.get("investment", 0),
+                total_benefit=summary_json.get("benefit", 0),
+                roi_percentage=summary_json.get("roi_percentage", 0),
+                implementation_timeframe=summary_json.get("implementation_timeframe", "不明"),
+                key_recommendations=[best_proposal] + summary_json.get("key_points", []),
+                priority_ranking=[
+                    {"proposal": prop.get("name", ""), 
+                     "priority": i+1, 
+                     "cost": prop.get("cost", 0), 
+                     "benefit": prop.get("benefit", 0),
+                     "roi": prop.get("roi", 0)
+                    } 
+                    for i, prop in enumerate(summary_json.get("alternative_proposals", []))
+                ]
+            )
+            
+            # 元のJSONもそのまま保持
+            result.original_summary = summary_json
+            result.target_node = summary_json.get("target_node", target_node)
+            
+            return result
+        except Exception as e:
+            print(f"Error parsing single node proposal summary: {str(e)}")
             # Return default summary if parsing fails
             return ProposalResult(
                 total_investment=0,
