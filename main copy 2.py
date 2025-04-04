@@ -184,206 +184,7 @@ def generate_node_question(nodes_without_values):
     
     return random.choice(questions)
 
-# 1. ROI情報を含むノード値更新関数
-def update_node_value_with_roi_data(mermaid_code, node_id, value, cost=None, benefit=None, implementation_period=None, priority=None):
-    """
-    指定したノードIDのノードに数値とROI情報を追加または更新する
-    """
-    lines = mermaid_code.strip().split('\n')
-    updated_lines = []
-    
-    for line in lines:
-        # ノード定義を検索（例: node1["テキスト"]）
-        node_match = re.search(rf'({node_id}\[\")([^\"]+)(\"\])', line)
-        if node_match:
-            # 既存の値の有無をチェック
-            current_label = node_match.group(2)
-            value_pattern = r'\(([^)]+)\)'
-            value_match = re.search(value_pattern, current_label)
-            
-            # ROI情報を構築
-            roi_info = []
-            
-            # コスト情報が提供されている場合
-            if cost is not None:
-                if cost >= 100000000:  # 1億円以上
-                    roi_info.append(f"コスト:{cost/100000000:.1f}億円")
-                elif cost >= 10000:  # 1万円以上
-                    roi_info.append(f"コスト:{cost/10000:.1f}万円")
-                else:
-                    roi_info.append(f"コスト:{cost:.0f}円")
-            
-            # ベネフィット情報が提供されている場合
-            if benefit is not None:
-                if benefit >= 100000000:  # 1億円以上
-                    roi_info.append(f"効果:{benefit/100000000:.1f}億円")
-                elif benefit >= 10000:  # 1万円以上
-                    roi_info.append(f"効果:{benefit/10000:.1f}万円")
-                else:
-                    roi_info.append(f"効果:{benefit:.0f}円")
-            
-            # ROIの計算（コストと利益の両方が提供されている場合）
-            if cost is not None and benefit is not None and cost > 0:
-                roi = (benefit - cost) / cost * 100
-                roi_info.append(f"ROI:{roi:.1f}%")
-            
-            # 実装期間が提供されている場合
-            if implementation_period:
-                roi_info.append(f"期間:{implementation_period}")
-                
-            # 優先度が提供されている場合
-            if priority:
-                roi_info.append(f"優先度:{priority}")
-            
-            # 更新するノード値を構築
-            if value_match:
-                # 既存の値を更新
-                updated_label = re.sub(value_pattern, f'({value})', current_label)
-            else:
-                # 新しい値を追加
-                updated_label = f"{current_label} ({value})"
-            
-            # ROI情報を追加（あれば）
-            if roi_info:
-                roi_text = "/".join(roi_info)
-                # すでにROI情報があるかチェック
-                roi_pattern = r'\[([^\]]+)\]'
-                roi_match = re.search(roi_pattern, updated_label)
-                
-                if roi_match:
-                    # 既存のROI情報を更新
-                    updated_label = re.sub(roi_pattern, f'[{roi_text}]', updated_label)
-                else:
-                    # 新しいROI情報を追加
-                    updated_label = f"{updated_label} [{roi_text}]"
-            
-            # 行を更新
-            updated_line = f'{node_match.group(1)}{updated_label}{node_match.group(3)}'
-            updated_lines.append(updated_line)
-        else:
-            updated_lines.append(line)
-    
-    return '\n'.join(updated_lines)
 
-
-# 2. ROIチャットエージェントとの対話を改善するための関数
-def process_chat_message_with_roi(user_message, chat_history, mermaid_diagram, roi_chat_agent):
-    """
-    ユーザーメッセージを処理し、ROI情報を抽出して対応するノードを更新する
-    
-    Args:
-        user_message: ユーザーからのメッセージ
-        chat_history: これまでのチャット履歴
-        mermaid_diagram: 現在のMermaidダイアグラム
-        roi_chat_agent: ROIチャットエージェント
-        
-    Returns:
-        更新されたMermaidダイアグラム、応答メッセージ
-    """
-    # 現在のROIツリー状態を取得
-    current_mermaid = mermaid_diagram
-    
-    # メッセージからノード情報と数値を抽出
-    analysis_result = roi_chat_agent.analyze_message(user_message, chat_history, current_mermaid)
-    
-    # ROI関連情報も分析
-    if analysis_result.get("found_node", False) and analysis_result.get("node_id"):
-        node_id = analysis_result["node_id"]
-        node_name = analysis_result.get("matched_label", "") or analysis_result.get("node_name", "")
-        
-        # ROI情報を抽出
-        roi_info = roi_chat_agent.nlu_agent.analyze_roi_from_conversation(chat_history, user_message, node_name)
-        
-        # ノードの値を更新すべきかどうかを判定
-        should_update = (
-            analysis_result.get("found_node", False) and 
-            analysis_result.get("node_id") and 
-            (
-                (analysis_result.get("found_value", False) and analysis_result.get("value")) or
-                (roi_info.get("found_cost", False) and roi_info.get("cost_value_yen") is not None) or
-                (roi_info.get("found_benefit", False) and roi_info.get("benefit_value_yen") is not None) or
-                (roi_info.get("roi_mentioned", False) and roi_info.get("roi_percentage") is not None)
-            )
-        )
-        
-        if should_update:
-            # 更新するための情報を収集
-            value = analysis_result.get("value") if analysis_result.get("found_value", False) else None
-            cost = roi_info.get("cost_value_yen")
-            benefit = roi_info.get("benefit_value_yen")
-            implementation_period = roi_info.get("implementation_period")
-            priority = roi_info.get("priority")
-            
-            # 数値のみが見つかった場合（コストとベネフィットが未設定）
-            if value and not cost and not benefit:
-                # 数値の性質を判断してコストまたはベネフィットとして割り当て
-                if "コスト" in user_message.lower() or "費用" in user_message.lower() or "投資" in user_message.lower():
-                    # コストとして処理
-                    try:
-                        cost_value = extract_numerical_value(value)
-                        cost = cost_value
-                    except:
-                        pass
-                elif "効果" in user_message.lower() or "ベネフィット" in user_message.lower() or "利益" in user_message.lower() or "売上" in user_message.lower():
-                    # ベネフィットとして処理
-                    try:
-                        benefit_value = extract_numerical_value(value)
-                        benefit = benefit_value
-                    except:
-                        pass
-            
-            # ノードの値を更新
-            updated_mermaid = update_node_value_with_roi_data(
-                current_mermaid, 
-                node_id, 
-                value or "値あり",  # 値がない場合はプレースホルダー
-                cost=cost,
-                benefit=benefit,
-                implementation_period=implementation_period,
-                priority=priority
-            )
-            
-            return updated_mermaid, None
-    
-    # 更新がない場合は元のままを返す
-    return current_mermaid, None
-
-
-# 3. 数値から金額を抽出する関数
-def extract_numerical_value(value_str):
-    """
-    文字列から数値を抽出して円単位に変換する
-    
-    Args:
-        value_str: 数値を含む文字列（単位付き）
-        
-    Returns:
-        円単位の数値
-    """
-    # カンマを削除
-    clean_str = value_str.replace(',', '')
-    
-    # 数値と単位を抽出
-    number_match = re.search(r'(\d+\.?\d*)', clean_str)
-    if not number_match:
-        return None
-        
-    number = float(number_match.group(1))
-    
-    # 単位による変換
-    if '億円' in clean_str:
-        return number * 100000000
-    elif '万円' in clean_str:
-        return number * 10000
-    elif '千円' in clean_str:
-        return number * 1000
-    elif '%' in clean_str:
-        return number  # パーセンテージはそのまま返す
-    elif '円' in clean_str:
-        return number
-    else:
-        return number  # 単位が不明な場合はそのまま返す
-    
 def render_combined_trees(challenge_mermaid, proposal_mermaid, height=800):
     """
     課題ツリーと提案ツリーを組み合わせて表示する
@@ -707,6 +508,7 @@ def main():
                     
                     # 現在のROIツリー状態を取得
                     current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
+                    current_root = mermaid_to_roi_tree(current_mermaid)
                     
                     # 現在のチャットフォーカスに応じた処理
                     if st.session_state.chat_focus == "unit_conversion":
@@ -717,7 +519,7 @@ def main():
                         conversion_agent = ConversionAgent(model_name=model_name)
                         additional_info = prompt
                         
-                        # 変換を実行（セルフリフレクション機能付き）
+                        # 変換を実行
                         conversion_result = conversion_agent.perform_conversion(
                             conversion_info.get("value", 0),
                             conversion_info.get("unit", ""),
@@ -732,33 +534,8 @@ def main():
                         if conversion_result.get("converted_value") is not None:
                             node_id = conversion_info.get("node_id")
                             if node_id:
-                                # コストかベネフィットかを判断
-                                is_cost = "コスト" in conversion_info.get("description", "").lower() or "費用" in conversion_info.get("description", "").lower()
-                                is_benefit = "効果" in conversion_info.get("description", "").lower() or "ベネフィット" in conversion_info.get("description", "").lower()
-                                
-                                # ROI情報付きで更新
-                                converted_value = conversion_result.get("converted_value")
-                                if is_cost:
-                                    updated_mermaid = update_node_value_with_roi_data(
-                                        current_mermaid, 
-                                        node_id, 
-                                        f"{conversion_result.get('converted_value')}円",
-                                        cost=converted_value
-                                    )
-                                elif is_benefit:
-                                    updated_mermaid = update_node_value_with_roi_data(
-                                        current_mermaid, 
-                                        node_id, 
-                                        f"{conversion_result.get('converted_value')}円",
-                                        benefit=converted_value
-                                    )
-                                else:
-                                    updated_mermaid = update_node_value_with_roi_data(
-                                        current_mermaid, 
-                                        node_id, 
-                                        f"{conversion_result.get('converted_value')}円"
-                                    )
-                                
+                                new_value = f"{conversion_result.get('converted_value')}円"
+                                updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, new_value)
                                 st.session_state.mermaid_history.append(updated_mermaid)
                         
                         # チャットフォーカスを元に戻す
@@ -773,9 +550,6 @@ def main():
                         for node_id, node_label in leaf_nodes:
                             # ノード名からカッコ部分を除去
                             clean_label = re.sub(r'\s*\([^)]+\)', '', node_label)
-                            # ROI部分も除去
-                            clean_label = re.sub(r'\s*\[[^\]]+\]', '', clean_label)
-                            
                             if clean_label.lower() in prompt.lower():
                                 prioritized_nodes.append({
                                     "node_id": node_id,
@@ -789,16 +563,53 @@ def main():
                             st.session_state.priority_nodes_text = f"優先ノード: {priority_text}"
                     else:
                         # 通常のデータ収集モード
-                        # ROI情報を含めた分析と更新
-                        updated_mermaid, response_override = process_chat_message_with_roi(
+                        # メッセージを分析して数値情報を抽出
+                        analysis_result = st.session_state.roi_chat_agent.analyze_message(
                             prompt, 
-                            st.session_state.chat_history, 
-                            current_mermaid, 
-                            st.session_state.roi_chat_agent
+                            st.session_state.chat_history,
+                            current_mermaid
                         )
                         
-                        # ツリーの更新があれば反映
-                        if updated_mermaid != current_mermaid:
+                        # 単位情報も分析
+                        unit_analysis = st.session_state.roi_chat_agent.analyze_unit_conversion(prompt)
+                        
+                        # ツリーを更新すべきかどうかを判定
+                        should_update = (
+                            analysis_result.get("found_node", False) and 
+                            analysis_result.get("found_value", False) and 
+                            analysis_result.get("node_id") and 
+                            analysis_result.get("value") and
+                            analysis_result.get("confidence", 0) > 50  # 確信度が50%以上
+                        )
+                        
+                        # 単位変換が必要かチェック
+                        needs_conversion = (
+                            unit_analysis.get("found_value", False) and
+                            unit_analysis.get("needs_conversion", False) and
+                            len(unit_analysis.get("additional_info_needed", [])) > 0
+                        )
+                        
+                        if needs_conversion and should_update:
+                            # 単位変換に必要な情報を保存
+                            conversion_info = {
+                                "node_id": analysis_result.get("node_id"),
+                                "node_name": analysis_result.get("node_name"),
+                                "value": unit_analysis.get("value"),
+                                "unit": unit_analysis.get("value_unit"),
+                                "description": analysis_result.get("matched_label", ""),
+                                "required_info": unit_analysis.get("additional_info_needed", [])
+                            }
+                            st.session_state.conversion_info = conversion_info
+                            
+                            # チャットフォーカスを単位変換に変更
+                            st.session_state.chat_focus = "unit_conversion"
+                        elif should_update:
+                            # 単位変換が不要な場合は直接更新
+                            node_id = analysis_result["node_id"]
+                            value = analysis_result["value"]
+                            
+                            # ノードの値を更新
+                            updated_mermaid = update_node_value_in_mermaid(current_mermaid, node_id, value)
                             st.session_state.mermaid_history.append(updated_mermaid)
                     
                     # 実際のレスポンスを生成（LLMストリーミング）
@@ -835,175 +646,94 @@ def main():
             if chat_started:
                 st.rerun()
     
-    # タブ2: 提案生成の修正部分
-
+    # タブ2: 提案生成
     with tab2:
         st.header("提案生成")
-        st.markdown("課題分析に基づいて、特定の末端ノードに対して具体的な提案を生成します。")
+        st.markdown("課題分析に基づいて、具体的な提案を生成します。提案は課題ツリーの末端ノードと1対1で対応し、下から上に逆さまに展開します。")
         
         # 課題ツリーが生成されているか確認
         if "mermaid_diagram" not in st.session_state and not st.session_state.mermaid_history:
             st.warning("最初に「課題分析」タブで課題ツリーを生成してください。")
         else:
+            # 優先ノードの表示
+            if st.session_state.prioritized_nodes:
+                st.success("選択された優先ノード: " + ", ".join([node["node_name"] for node in st.session_state.prioritized_nodes]))
+            
+            # 提案の方向性を入力するテキストエリア
+            if "proposal_guidance_text" not in st.session_state:
+                st.session_state.proposal_guidance_text = ""
+            
+            proposal_guidance = st.text_area(
+                "提案の方向性（任意）",
+                value=st.session_state.proposal_guidance_text,
+                height=100,
+                placeholder="例: コスト効率を重視し、段階的に導入できるソリューションを希望します。現場の反発を最小限に抑える方法も考慮してください。"
+            )
+            
+            # 提案のサンプル文を表示
+            with st.expander("提案の方向性の例"):
+                st.markdown("""
+                **例1: コスト効率重視**
+                > コスト効率を重視し、初期投資を抑えながら効果を最大化する提案が欲しい。ROIは30%以上を目標とし、1年以内に効果が見えるソリューションを優先したい。
+
+                **例2: 段階的導入**
+                > リスクを分散するため、段階的に導入できる提案が望ましい。第一フェーズは3ヶ月以内に開始でき、効果が早く見えるものから始めたい。
+
+                **例3: 人材活用**
+                > 現場のAI不安に配慮し、既存スタッフのスキルアップを含めた人材活用型の提案を希望。教育コストも含めた総合的なROI計算を示してほしい。
+                """)
+            
             # 現在のROIツリーを取得（更新履歴がある場合は最新のものを使用）
             current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
             
-            # 末端ノードの抽出
-            leaf_nodes = extract_leaf_nodes(current_mermaid)
+            # 優先ノードをテキスト形式に変換
+            priority_nodes_text = ""
+            if st.session_state.prioritized_nodes:
+                priority_nodes_text = "\n".join([f"- {node['node_name']}" for node in st.session_state.prioritized_nodes])
             
-            # セッション状態の初期化
-            if "selected_node" not in st.session_state:
-                st.session_state.selected_node = None
-            if "node_selection_complete" not in st.session_state:
-                st.session_state.node_selection_complete = False
-            
-            # ステップ1: ノード選択セクション
-            st.subheader("ステップ1: 課題ノードの選択")
-            
-            # 末端ノードのリストを表示
-            node_options = [label for _, label in leaf_nodes]
-            
-            # 選択セクション
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                selected_index = 0
-                if st.session_state.selected_node in node_options:
-                    selected_index = node_options.index(st.session_state.selected_node)
+            # 提案生成ボタン
+            if st.button("提案を生成", type="primary"):
+                with st.spinner("提案を生成中..."):
+                    # 数値がないノードをチェック
+                    nodes_without_values = extract_nodes_without_values(current_mermaid)
+                    if nodes_without_values:
+                        st.warning(f"まだ{len(nodes_without_values)}個のノードに数値が設定されていません。より正確な提案のために、すべてのノードに数値を設定することをお勧めします。")
+                        missing_list = ", ".join([label for _, label in nodes_without_values])
+                        st.info(f"数値が設定されていないノード: {missing_list}")
                     
-                selected_node = st.selectbox(
-                    "提案を生成する対象ノードを選択してください",
-                    node_options,
-                    index=selected_index,
-                    help="特定のノードを選択すると、そのノードに対する提案が生成されます。"
-                )
-            
-            with col2:
-                if st.button("ノードを確定", disabled=st.session_state.node_selection_complete):
-                    st.session_state.selected_node = selected_node
-                    st.session_state.node_selection_complete = True
+                    # ProposalAgentを初期化して実行
+                    proposal_agent = ProposalAgent(model_name=model_name)
                     
-                    # 対応するノードIDを検索
-                    selected_node_id = None
-                    for node_id, label in leaf_nodes:
-                        if label == selected_node:
-                            selected_node_id = node_id
-                            break
+                    # ストリーミング出力用のコンテナ
+                    proposal_container = st.empty()
                     
-                    st.session_state.selected_node_id = selected_node_id
-                    st.rerun()
-            
-            # ノード選択の表示
-            if st.session_state.node_selection_complete and st.session_state.selected_node:
-                st.success(f"選択されたノード: {st.session_state.selected_node}")
-                
-                # 選択されたノードの表示（オプション）
-                st.markdown("### 選択されたノード")
-                
-                # 選択されたノード用のMermaidコード生成
-                selected_node_mermaid = "flowchart TD\n"
-                for node_id, label in leaf_nodes:
-                    if label == st.session_state.selected_node:
-                        # 選択されたノードを強調表示
-                        selected_node_mermaid += f'    {node_id}["{label}"]:::selected\n'
-                        break
-                
-                selected_node_mermaid += "    classDef selected fill:#f9a826,stroke:#333,stroke-width:2px;"
-                
-                # Mermaidダイアグラム表示
-                render_mermaid(selected_node_mermaid, height=150)
-                
-                # ステップ2: 提案内容の指定
-                st.subheader("ステップ2: 提案の方向性の指定")
-                
-                # 提案の方向性を入力するテキストエリア
-                if "proposal_guidance_text" not in st.session_state:
-                    st.session_state.proposal_guidance_text = ""
-                
-                proposal_guidance = st.text_area(
-                    "提案の方向性（任意）",
-                    value=st.session_state.proposal_guidance_text,
-                    height=100,
-                    placeholder="例: コスト効率を重視し、段階的に導入できるソリューションを希望します。現場の反発を最小限に抑える方法も考慮してください。"
-                )
-                
-                # 提案のサンプル文を表示
-                with st.expander("提案の方向性の例"):
-                    st.markdown("""
-                    **例1: コスト効率重視**
-                    > コスト効率を重視し、初期投資を抑えながら効果を最大化する提案が欲しい。ROIは30%以上を目標とし、1年以内に効果が見えるソリューションを優先したい。
-
-                    **例2: 段階的導入**
-                    > リスクを分散するため、段階的に導入できる提案が望ましい。第一フェーズは3ヶ月以内に開始でき、効果が早く見えるものから始めたい。
-
-                    **例3: 人材活用**
-                    > 現場のAI不安に配慮し、既存スタッフのスキルアップを含めた人材活用型の提案を希望。教育コストも含めた総合的なROI計算を示してほしい。
-                    """)
-                
-                # ステップ3: 提案生成
-                st.subheader("ステップ3: 提案の生成")
-                
-                # 提案生成ボタン
-                if st.button("提案を生成", type="primary"):
-                    with st.spinner(f"「{st.session_state.selected_node}」に対する提案を生成中..."):
-                        # 数値がないノードをチェック（選択されたノードに数値があるか確認）
-                        selected_node_has_value = True
-                        for _, label in extract_nodes_without_values(current_mermaid):
-                            if label == st.session_state.selected_node:
-                                selected_node_has_value = False
-                                break
-                        
-                        if not selected_node_has_value:
-                            st.warning(f"選択されたノード「{st.session_state.selected_node}」には数値が設定されていません。より正確な提案のために、先に数値を設定することをお勧めします。")
-                        
-                        # ProposalAgentを初期化
-                        proposal_agent = ProposalAgent(model_name=model_name)
-                        
-                        # ストリーミング出力用のコンテナ
-                        proposal_container = st.empty()
-                        
-                        # ストリーミングハンドラ
-                        stream_handler = StreamHandler(proposal_container)
-                        
-                        # 特定のノードに対する提案生成
-                        proposal_text, summary = proposal_agent.generate_single_node_proposal(
-                            current_mermaid,
-                            st.session_state.selected_node,
-                            proposal_guidance=proposal_guidance,
-                            callback=stream_handler
-                        )
-                        
-                        # 結果を保存
-                        st.session_state.proposal_text = proposal_text
-                        st.session_state.proposal_summary = summary
-                        st.session_state.proposal_guidance_text = proposal_guidance
-                        st.session_state.proposal_type = "single"
-                        
-                        # ソリューション推薦エージェントの実行（選択されたノードのみを対象とする）
-                        solution_agent = SolutionAgent(model_name=model_name)
-                        
-                        solution_recommendations = solution_agent.recommend_solutions(
-                            st.session_state.selected_node,
-                            "",  # 優先ノードなし
-                            proposal_guidance
-                        )
-                        
-                        st.session_state.solution_recommendations = solution_recommendations
-            
-            # 「やり直す」ボタン - ノード選択をリセット
-            if st.session_state.node_selection_complete:
-                if st.button("選択し直す"):
-                    st.session_state.node_selection_complete = False
-                    st.session_state.selected_node = None
-                    st.session_state.selected_node_id = None
+                    # ストリーミングハンドラ
+                    stream_handler = StreamHandler(proposal_container)
                     
-                    # 提案結果もクリア
-                    if "proposal_text" in st.session_state:
-                        del st.session_state.proposal_text
-                    if "proposal_summary" in st.session_state:
-                        del st.session_state.proposal_summary
+                    # ストリーミングでの提案生成
+                    proposal_text, summary = proposal_agent.generate_proposal_streaming(
+                        current_mermaid,
+                        proposal_guidance,
+                        priority_nodes=priority_nodes_text,
+                        callback=stream_handler
+                    )
                     
-                    st.rerun()
+                    # 結果を保存
+                    st.session_state.proposal_text = proposal_text
+                    st.session_state.proposal_summary = summary
+                    st.session_state.proposal_guidance_text = proposal_guidance
+                    
+                    # ソリューション推薦エージェントも実行
+                    solution_agent = SolutionAgent(model_name=model_name)
+                    leaf_nodes_text = "\n".join([f"- {label}" for _, label in extract_leaf_nodes(current_mermaid)])
+                    
+                    solution_recommendations = solution_agent.recommend_solutions(
+                        leaf_nodes_text,
+                        priority_nodes_text,
+                        proposal_guidance
+                    )
+                    
+                    st.session_state.solution_recommendations = solution_recommendations
             
             # 提案結果の表示
             if "proposal_text" in st.session_state:
@@ -1042,116 +772,96 @@ def main():
                         proposal_mermaid = None
                 
                 # 提案ツリーと提案サマリーを表示するためのタブ
-                prop_tab1, prop_tab2, prop_tab3 = st.tabs(["提案詳細", "代替案比較", "ROI詳細"])
+                prop_tab1, prop_tab2, prop_tab3, prop_tab4 = st.tabs(["統合ビュー", "提案ツリー", "提案サマリー", "具体的ソリューション"])
                 
                 with prop_tab1:
-                    st.subheader(f"選択ノード: {st.session_state.selected_node}")
-                    
+                    st.subheader("課題と提案の統合ビュー")
                     if proposal_mermaid:
-                        st.markdown("### 提案ツリー図")
-                        render_mermaid(proposal_mermaid, height=400)
-                    
-                    summary = st.session_state.proposal_summary
-                    
-                    # 単一ノード提案の場合の詳細表示
-                    if hasattr(summary, 'original_summary') and summary.original_summary:
-                        orig = summary.original_summary
-                        
-                        # 最適提案の詳細
-                        st.subheader("最適提案")
-                        st.markdown(f"**{orig.get('best_proposal', '---')}**")
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("投資額", f"{orig.get('investment', 0):,.0f}円")
-                        with col2:
-                            st.metric("期待効果", f"{orig.get('benefit', 0):,.0f}円")
-                        with col3:
-                            st.metric("ROI", f"{orig.get('roi_percentage', 0):.1f}%")
-                        
-                        st.markdown(f"**実装期間**: {orig.get('implementation_timeframe', '---')}")
-                        
-                        # 主要ポイント
-                        st.markdown("### 主要ポイント")
-                        for point in orig.get('key_points', []):
-                            st.markdown(f"- {point}")
+                        # 末端ノードと提案ノードを結ぶ接続線が含まれる統合ビューを表示
+                        render_combined_trees(
+                            current_mermaid,
+                            proposal_mermaid,
+                            height=900
+                        )
                     else:
-                        # 通常のサマリー表示（フォールバック）
-                        st.subheader("提案詳細")
-                        st.markdown(st.session_state.proposal_text)
+                        st.warning("提案ツリーの表示に問題があります。個別のツリーをご確認ください。")
                 
                 with prop_tab2:
-                    # 代替案比較
-                    if hasattr(summary, 'original_summary') and summary.original_summary:
-                        orig = summary.original_summary
-                        
-                        st.subheader("代替案比較")
-                        
-                        # 代替案のデータフレーム表示
-                        alternatives = orig.get('alternative_proposals', [])
-                        if alternatives:
-                            alt_data = []
-                            for alt in alternatives:
-                                alt_data.append({
-                                    "提案名": alt.get('name', ''),
-                                    "投資額": alt.get('cost', 0),
-                                    "期待効果": alt.get('benefit', 0),
-                                    "ROI": alt.get('roi', 0)
-                                })
-                            
-                            alt_df = pd.DataFrame(alt_data)
-                            st.dataframe(alt_df.style.format({
-                                "投資額": "{:,.0f}円",
-                                "期待効果": "{:,.0f}円",
-                                "ROI": "{:.1f}%"
-                            }), use_container_width=True)
-                        else:
-                            st.info("代替案情報がありません")
+                    if proposal_mermaid:
+                        st.subheader("提案ツリー図（下から上に生える逆さまツリー）")
+                        render_mermaid(proposal_mermaid, height=600)
                     else:
-                        st.info("代替案情報を取得できませんでした")
+                        st.warning("提案ツリーの表示に問題があります。Mermaidコードを確認してください。")
+                        with st.expander("生成されたテキスト"):
+                            st.markdown(st.session_state.proposal_text)
+                    
+                    # 完全な提案テキストも表示
+                    with st.expander("提案テキスト全文"):
+                        st.markdown(st.session_state.proposal_text)
                 
                 with prop_tab3:
-                    # ROI詳細
-                    st.subheader("ROI詳細分析")
+                    summary = st.session_state.proposal_summary
                     
-                    if hasattr(summary, 'original_summary') and summary.original_summary:
-                        orig = summary.original_summary
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            # 初期投資とリターンの内訳
-                            st.markdown("### 初期投資の内訳")
-                            st.markdown("- 提案実装コスト: {0:,.0f}円".format(orig.get('investment', 0) * 0.7))
-                            st.markdown("- 教育・トレーニングコスト: {0:,.0f}円".format(orig.get('investment', 0) * 0.15))
-                            st.markdown("- メンテナンスコスト: {0:,.0f}円".format(orig.get('investment', 0) * 0.15))
-                            
-                        with col2:
-                            # 期待効果の内訳
-                            st.markdown("### 期待効果の内訳")
-                            st.markdown("- 直接的効果: {0:,.0f}円".format(orig.get('benefit', 0) * 0.8))
-                            st.markdown("- 間接的効果: {0:,.0f}円".format(orig.get('benefit', 0) * 0.2))
-                        
-                        # ROI計算の詳細
-                        st.markdown("### ROI計算の詳細")
-                        investment = orig.get('investment', 0)
-                        benefit = orig.get('benefit', 0)
-                        
-                        if investment > 0:
-                            roi = (benefit - investment) / investment * 100
-                            st.markdown(f"ROI = (期待効果 - 投資額) / 投資額 × 100%")
-                            st.markdown(f"ROI = ({benefit:,.0f}円 - {investment:,.0f}円) / {investment:,.0f}円 × 100% = {roi:.1f}%")
-                            
-                            # 投資回収期間
-                            if benefit > 0:
-                                payback_period = investment / benefit
-                                payback_months = int(payback_period * 12)
-                                st.markdown(f"投資回収期間 = 投資額 / 年間期待効果 = {payback_period:.2f}年（約{payback_months}ヶ月）")
-                            else:
-                                st.markdown("期待効果がゼロのため投資回収期間は計算できません")
-                        else:
-                            st.markdown("投資額がゼロのためROIは計算できません")
+                    # ROI結果のハイライト表示
+                    st.subheader("ROI計算結果")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("総投資額", f"{summary.total_investment:,.0f}円")
+                    with col2:
+                        st.metric("総期待効果", f"{summary.total_benefit:,.0f}円")
+                    with col3:
+                        st.metric("ROI", f"{summary.roi_percentage:.1f}%")
+                    
+                    # 期待利益の計算
+                    if summary.total_investment > 0:
+                        net_profit = summary.total_benefit - summary.total_investment
+                        roi_ratio = net_profit/summary.total_investment
+                        st.metric("期待利益", f"{net_profit:,.0f}円", delta=f"{roi_ratio:.1%}")
                     else:
-                        st.info("ROI詳細情報を取得できませんでした")
+                        st.metric("期待利益", "計算できません", delta=None)
+                    
+                    st.subheader("実装期間")
+                    st.info(summary.implementation_timeframe)
+                    
+                    st.subheader("主要提案ポイント")
+                    for i, point in enumerate(summary.key_recommendations, 1):
+                        st.markdown(f"{i}. {point}")
+                    
+                    # 優先度ランキングがあれば表示
+                    if summary.priority_ranking:
+                        st.subheader("提案の優先度ランキング")
+                        ranking_df = pd.DataFrame(summary.priority_ranking)
+                        st.dataframe(ranking_df, use_container_width=True)
+                
+                with prop_tab4:
+                    st.subheader("具体的なソリューション提案")
+                    
+                    if "solution_recommendations" in st.session_state:
+                        recommendations = st.session_state.solution_recommendations.get("solution_recommendations", [])
+                        
+                        if recommendations:
+                            # 優先度でソート
+                            sorted_recommendations = sorted(recommendations, key=lambda x: x.get("priority", 999))
+                            
+                            for i, rec in enumerate(sorted_recommendations):
+                                with st.expander(f"#{rec.get('priority', i+1)} {rec.get('solution_name', 'ソリューション')}"):
+                                    st.markdown(f"**ノード**: {rec.get('leaf_node_name', '不明')}")
+                                    st.markdown(f"**説明**: {rec.get('solution_description', '説明なし')}")
+                                    
+                                    est_cost = rec.get('estimated_cost', {})
+                                    est_benefit = rec.get('estimated_benefit', {})
+                                    
+                                    col1, col2, col3 = st.columns(3)
+                                    with col1:
+                                        st.markdown(f"**実装コスト**: {est_cost.get('value', '不明')} {est_cost.get('unit', '')}")
+                                    with col2:
+                                        st.markdown(f"**期待効果**: {est_benefit.get('value', '不明')} {est_benefit.get('unit', '')}")
+                                    with col3:
+                                        st.markdown(f"**実装期間**: {rec.get('implementation_timeframe', '不明')}")
+                        else:
+                            st.info("具体的なソリューション提案は生成されていません。")
+                    else:
+                        st.info("具体的なソリューション提案は生成されていません。")
     
     # タブ3: ROI計算
     with tab3:

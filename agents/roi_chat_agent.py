@@ -1,6 +1,6 @@
 """
 agents/roi_chat_agent.py
-ROI Chat Agent for interactive data collection and analysis
+ROI Chat Agent for interactive data collection and analysis with cost-benefit focus
 """
 from typing import Dict, List, Tuple, Optional, Any, Callable
 import json
@@ -37,19 +37,24 @@ class ROIChatAgent:
         self.nlu_agent = NLUAgent(model_name)
         self.conversion_agent = ConversionAgent(model_name)
         
-        # チャット用のプロンプト
+        # チャット用のプロンプト（ROI計算が可能なデータ収集に焦点）
         self.chat_prompt = ChatPromptTemplate.from_messages([
             ("system", """あなたはROIツリー分析のエキスパートです。ユーザーと対話しながら、ROIツリーの各ノードに適切な数値を設定し、ビジネス分析を支援します。
 
-現在のROIツリーには、まだ数値が設定されていないノードがあります。自然な会話の中で、こうしたノードに適切な数値を設定できるよう誘導してください。
+現在のROIツリーには、まだ数値が設定されていないノードがあります。各ノードについて、以下の情報を収集することが重要です：
+1. コスト情報 - 実装や対応にかかる費用
+2. ベネフィット情報 - 期待される効果や利益
+3. 時間的情報 - 実装期間や効果が現れるまでの時間
+
+これにより、各ノードのROI（投資対効果）を計算できます：ROI = (ベネフィット - コスト) / コスト × 100%
 
 レスポンスでは以下を心がけてください：
+- コストとベネフィットの両方の情報を収集するよう心掛ける
 - 会話は親しみやすく自然な流れを保つ
 - 数値情報のリクエストは押し付けがましくならないよう配慮する
 - ユーザーが提供した情報を受け止め、適切なフィードバックを提供する
-- ROIツリーの構造や目的に関する質問にも答える
+- 具体的な数値を引き出すための適切な質問をする
 - 一度に複数のノードの情報を求めないよう注意する
-- ユーザーが単位変換に必要な情報を提供した場合は、それを活用する
 
 以下のノードについての情報を対話的に収集してください：
 {nodes_without_values}
@@ -60,7 +65,7 @@ class ROIChatAgent:
             ("human", "{user_message}")
         ])
         
-        # 単位変換ヒアリング用のプロンプト
+        # 単位変換ヒアリング用のプロンプト（セルフリフレクションを促す）
         self.conversion_prompt = ChatPromptTemplate.from_messages([
             ("system", """あなたはROI分析の専門家であり、数値の単位変換が必要な状況です。
 ユーザーとの自然な会話の中で、単位変換に必要な追加情報を収集してください。
@@ -72,6 +77,32 @@ class ROIChatAgent:
 
 この情報をROI計算に使用するためには、以下の追加情報が必要です：
 {required_info}
+
+自然な対話を通じてこれらの情報を収集してください。
+押し付けがましくならないよう注意し、ユーザーが回答しやすい質問の仕方を心がけてください。
+
+収集した情報は慎重に評価し、以下を考慮してください：
+- 変換の正確性と信頼性
+- 前提条件の妥当性
+- 代替的な解釈の可能性
+- 業界標準や一般的な指標との整合性
+"""),
+            ("human", "{user_message}")
+        ])
+        
+        # コスト・ベネフィット情報収集用のプロンプト（新規）
+        self.cost_benefit_prompt = ChatPromptTemplate.from_messages([
+            ("system", """あなたはROI分析の専門家であり、特にコストとベネフィットの情報収集に長けています。
+ユーザーとの自然な会話の中で、特定のノードに関するコストとベネフィットの情報を収集してください。
+
+現在のノード: {node_name}
+
+このノードについて、以下の情報を収集することが重要です：
+1. 実装コスト - どれくらいの費用がかかるか
+2. 期待効果/ベネフィット - どれくらいの効果や利益が見込めるか
+3. 実装期間 - 効果が出るまでにどれくらいの時間がかかるか
+
+これらの情報が揃えば、ROI = (ベネフィット - コスト) / コスト × 100% の計算が可能になります。
 
 自然な対話を通じてこれらの情報を収集してください。
 押し付けがましくならないよう注意し、ユーザーが回答しやすい質問の仕方を心がけてください。
@@ -89,7 +120,11 @@ class ROIChatAgent:
 以下の末端ノードについて、ユーザーがどれを優先したいかを自然な対話で尋ねてください：
 {leaf_nodes}
 
-ユーザーが明確な優先順位を示していない場合は、各ノードのビジネスインパクトや実現可能性について質問を行い、優先度を判断する材料を集めてください。
+ユーザーが明確な優先順位を示していない場合は、以下の視点から質問を行い、優先度を判断する材料を集めてください：
+1. ビジネスインパクト - どのノードが最も大きな効果をもたらすか
+2. ROIの大きさ - どのノードが最も高いROIを期待できるか
+3. 実現のしやすさ - どのノードが最も実装が容易か
+4. 緊急性 - どのノードが最も早急に対応すべきか
 """),
             ("human", "{user_message}")
         ])
@@ -101,16 +136,20 @@ class ROIChatAgent:
         nodes_text = "\n".join([f"- {label}" for _, label in nodes_without_values])
         
         # 次のステップを決定
-        next_step = "データ収集を継続してください。"
+        next_step = "データ収集を継続してください。各ノードのコストとベネフィットの両方を収集するよう心がけてください。"
         if current_focus == "data_collection" and not nodes_without_values:
-            next_step = "すべてのノードにデータが揃いました。次は優先ノードの選択に進むべきです。どのノードを優先的に解決したいか尋ねてください。"
+            next_step = "すべてのノードにデータが揃いました。次は優先ノードの選択に進むべきです。ROIが最も高いノードを特定し、どのノードを優先的に解決したいか尋ねてください。"
         elif current_focus == "prioritization":
-            next_step = "優先ノードの選択を行なってください。ユーザーにとって最も重要な課題は何か、どのノードから解決すべきかを尋ねてください。"
+            next_step = "優先ノードの選択を行なってください。ユーザーにとって最も重要な課題は何か、ROIが最も高いノードはどれか、どのノードから解決すべきかを尋ねてください。"
         elif current_focus == "unit_conversion":
             # 変換情報から次のステップを設定
             conversion_info = conversation_history[-1].get("conversion_info", {})
             required_info = ", ".join(conversion_info.get("required_info", []))
-            next_step = f"単位変換に必要な情報を収集してください。必要な情報: {required_info}"
+            next_step = f"単位変換に必要な情報を収集してください。必要な情報: {required_info}。変換後にはROI計算ができるようにコストとベネフィットを明確にしてください。"
+        elif current_focus == "cost_benefit":
+            # コスト・ベネフィット情報収集モード
+            node_name = st.session_state.get("current_node_name", "選択されたノード")
+            next_step = f"「{node_name}」のコストとベネフィットの両方の情報を収集してください。これによりROIの計算が可能になります。"
         
         # プロンプトを選択
         if current_focus == "unit_conversion":
@@ -126,6 +165,14 @@ class ROIChatAgent:
                 unit=unit,
                 node_name=node_name,
                 required_info=required_info,
+                user_message=user_message
+            )
+        elif current_focus == "cost_benefit":
+            # コスト・ベネフィット情報収集モード
+            node_name = st.session_state.get("current_node_name", "選択されたノード")
+            
+            prompt = self.cost_benefit_prompt.format(
+                node_name=node_name,
                 user_message=user_message
             )
         elif current_focus == "prioritization":
@@ -170,12 +217,13 @@ class ROIChatAgent:
         return self.conversion_agent.analyze_conversion_needs(value, unit, description)
     
     def perform_conversion(self, value: float, unit: str, description: str = "", additional_info: str = "") -> Dict:
-        """数値の単位変換を実行する"""
+        """数値の単位変換を実行する（セルフリフレクション付き）"""
         return self.conversion_agent.perform_conversion(value, unit, description, additional_info)
     
     def generate_node_question(self, nodes_without_values) -> str:
         """
         数値が欠けているノードについて質問を生成する
+        コストとベネフィットの両方の情報を求める質問を優先
         """
         if not nodes_without_values:
             return "すべてのノードには既に数値が設定されています。ROIツリーについて他に質問はありますか？"
@@ -183,15 +231,63 @@ class ROIChatAgent:
         # ランダムに1つのノードを選択
         node_id, node_label = random.choice(nodes_without_values)
         
-        # 質問のバリエーション
+        # コストとベネフィットの両方を求める質問のバリエーション
         questions = [
-            f"「{node_label}」について、具体的な数値目標はありますか？金額や割合など、どのくらいの効果を期待していますか？",
-            f"「{node_label}」について、どのくらいの影響があると予想されますか？例えば売上増加額や削減率など教えていただけますか？",
-            f"「{node_label}」の目標値や期待効果について教えてください。",
-            f"「{node_label}」に関してはどの程度の効果を見込んでいますか？"
+            f"「{node_label}」について、実装コストと期待される効果の両方を教えていただけますか？これによりROIを計算できます。",
+            f"「{node_label}」に関して、どのくらいのコストがかかり、どのくらいのベネフィットが期待できますか？",
+            f"「{node_label}」の投資額と期待リターンについて具体的な数値をお持ちでしょうか？",
+            f"「{node_label}」にかかるコストと、それによってもたらされる効果を数値で表すとどうなりますか？"
         ]
         
         return random.choice(questions)
+    
+    def extract_cost_benefit_from_message(self, message: str) -> Dict[str, Any]:
+        """
+        メッセージからコストとベネフィット情報を抽出する（新規）
+        """
+        # 金額のパターン
+        cost_patterns = [
+            r'コスト[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'費用[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'投資[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?コスト',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?費用',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?投資'
+        ]
+        
+        benefit_patterns = [
+            r'効果[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'ベネフィット[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'リターン[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'利益[は：:]*\s*(\d+[,.]?\d*\s*[億万千]?円)',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?効果',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?ベネフィット',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?リターン',
+            r'(\d+[,.]?\d*\s*[億万千]?円)[の]?利益'
+        ]
+        
+        # コスト情報を抽出
+        cost_value = None
+        for pattern in cost_patterns:
+            matches = re.search(pattern, message)
+            if matches:
+                cost_value = matches.group(1)
+                break
+        
+        # ベネフィット情報を抽出
+        benefit_value = None
+        for pattern in benefit_patterns:
+            matches = re.search(pattern, message)
+            if matches:
+                benefit_value = matches.group(1)
+                break
+        
+        return {
+            "found_cost": cost_value is not None,
+            "cost_value": cost_value,
+            "found_benefit": benefit_value is not None,
+            "benefit_value": benefit_value
+        }
     
     def extract_nodes_without_values(self, mermaid_code):
         """
@@ -226,3 +322,66 @@ class ROIChatAgent:
         Mermaidコードから末端ノード（他のノードの親になっていないノード）を抽出する
         """
         return self.nlu_agent.extract_leaf_nodes(mermaid_code)
+    
+    # 新規: ROIを計算する関数
+    def calculate_roi(self, cost_value: str, benefit_value: str) -> float:
+        """
+        コストとベネフィットからROIを計算する
+        
+        Args:
+            cost_value: コスト値（文字列形式、単位付き）
+            benefit_value: ベネフィット値（文字列形式、単位付き）
+            
+        Returns:
+            ROI値（%）、計算できない場合はNone
+        """
+        try:
+            # 単位を統一して数値に変換
+            cost = self._convert_to_yen(cost_value)
+            benefit = self._convert_to_yen(benefit_value)
+            
+            if cost <= 0:
+                return None
+            
+            # ROI計算: (ベネフィット - コスト) / コスト × 100%
+            roi = (benefit - cost) / cost * 100
+            return roi
+        except:
+            return None
+    
+    def _convert_to_yen(self, value_str: str) -> float:
+        """
+        金額文字列を円単位の数値に変換する
+        
+        Args:
+            value_str: 金額文字列（例: 1億円, 500万円, 1,000円）
+            
+        Returns:
+            円単位の数値
+        """
+        if not value_str:
+            return 0
+        
+        # カンマを削除
+        value_str = value_str.replace(',', '')
+        
+        # 単位に基づいて変換
+        if '億円' in value_str:
+            # 億円 → 円
+            num_str = value_str.replace('億円', '')
+            return float(num_str) * 100000000
+        elif '万円' in value_str:
+            # 万円 → 円
+            num_str = value_str.replace('万円', '')
+            return float(num_str) * 10000
+        elif '千円' in value_str:
+            # 千円 → 円
+            num_str = value_str.replace('千円', '')
+            return float(num_str) * 1000
+        elif '円' in value_str:
+            # すでに円単位
+            num_str = value_str.replace('円', '')
+            return float(num_str)
+        else:
+            # 単位がない場合はそのまま変換
+            return float(value_str)

@@ -1,257 +1,403 @@
 """
 domain/roitree.py
-Simplified ROI tree implementation for business analysis.
+ROI Tree data structure and utilities
 """
-from typing import Dict, List, Optional, Any
-import uuid
+from typing import List, Dict, Optional, Tuple, Any
+import re
+
+from domain.schemas import ROIData, NodeRiskReturn
 
 
 class ROINode:
-    """
-    ROI Tree Node representing business challenges or proposals
+    """ROIツリーのノードを表すクラス"""
     
-    Attributes:
-        name: Node name (e.g., "CostReduction", "RevenueIncrease")
-        details: Additional information about the node
-        value: Monetary value associated with the node (target or expected benefit)
-        children: List of child nodes
-        node_id: Unique identifier for the node
-    """
-    def __init__(
-        self, 
-        name: str, 
-        details: Optional[str] = None,
-        value: Optional[float] = None
-    ):
-        self.name = name
-        self.details = details
-        self.value = value
-        self.children: List["ROINode"] = []
-        self.node_id = str(uuid.uuid4())[:8]  # Short unique ID
-    
-    def add_child(self, child: "ROINode") -> "ROINode":
-        """Add a child node and return it"""
-        self.children.append(child)
-        return child
-    
-    def find_node_by_id(self, node_id: str) -> Optional["ROINode"]:
-        """Recursively find a node by its ID"""
-        if self.node_id == node_id:
-            return self
-        
-        for child in self.children:
-            found = child.find_node_by_id(node_id)
-            if found:
-                return found
-        
-        return None
-    
-    def calculate_roi(self) -> Dict[str, Any]:
+    def __init__(self, node_id: str, name: str, value: Optional[str] = None):
         """
-        Calculate ROI for this node and its subtree
-        
-        Returns:
-            Dictionary containing ROI calculations and breakdown
-        """
-        if not self.children:
-            return {
-                "node_id": self.node_id,
-                "name": self.name,
-                "value": self.value or 0,
-                "children_values": []
-            }
-        
-        children_calculations = []
-        total_value = 0
-        
-        for child in self.children:
-            child_calc = child.calculate_roi()
-            child_value = child_calc["value"]
-            total_value += child_value
-            
-            children_calculations.append({
-                "node_id": child.node_id,
-                "name": child.name,
-                "value": child_value,
-                "children": child_calc.get("children_values", [])
-            })
-        
-        return {
-            "node_id": self.node_id,
-            "name": self.name,
-            "value": total_value,
-            "children_values": children_calculations
-        }
-    
-    def to_dict(self) -> Dict:
-        """Convert the node to a dictionary for JSON serialization"""
-        return {
-            "node_id": self.node_id,
-            "name": self.name,
-            "details": self.details,
-            "value": self.value,
-            "children": [c.to_dict() for c in self.children]
-        }
-    
-    def to_mermaid(self, parent_id: Optional[str] = None) -> List[str]:
-        """
-        Generate Mermaid diagram syntax for this node and its children
+        ROIノードの初期化
         
         Args:
-            parent_id: Optional ID of parent node for connecting edges
-            
-        Returns:
-            List of Mermaid diagram lines
+            node_id: ノードID
+            name: ノード名
+            value: 数値（オプション）
         """
-        node_id = f"node{self.node_id.replace('-', '')}"
+        self.id = node_id
+        self.name = name
+        self.value = value
+        self.children = []
+        self.parent = None
         
-        # Add value to node label if available
-        node_label = self.name
-        if self.value is not None:
-            node_label += f" ({format_value(self.value)})"
-            
-        lines = [f"    {node_id}[\"{node_label}\"]"]
+        # 新規: ROI関連フィールド
+        self.cost = None
+        self.benefit = None
+        self.roi_percentage = None
+        self.implementation_period = None
+        self.priority = None
+    
+    def add_child(self, child: 'ROINode') -> None:
+        """
+        子ノードを追加する
         
-        # Add connection to parent
-        if parent_id:
-            lines.append(f"    {parent_id} --> {node_id}")
-        
-        # Process children recursively
-        for child in self.children:
-            child_lines = child.to_mermaid(node_id)
-            lines.extend(child_lines)
-            
-        return lines
+        Args:
+            child: 追加する子ノード
+        """
+        self.children.append(child)
+        child.parent = self
     
     def get_full_mermaid(self) -> str:
         """
-        Generate complete Mermaid diagram representation
+        Mermaid記法の完全なツリー図を生成する
         
         Returns:
-            Complete Mermaid diagram syntax for this tree
+            Mermaid記法の文字列
         """
-        lines = ["graph TD"]
-        lines.extend(self.to_mermaid())
-        return "\n".join(lines)
-
-
-def format_value(value: float) -> str:
-    """Format monetary value for display"""
-    if abs(value) >= 10000000:  # 1千万以上
-        return f"{value/10000000:.1f}億円"
-    elif abs(value) >= 10000:  # 1万以上
-        return f"{value/10000:.1f}万円"
-    else:
-        return f"{value:,.0f}円"
-
-
-def create_default_roi_tree() -> ROINode:
-    """
-    Create a default ROI tree with basic cost reduction and revenue increase nodes
+        lines = ["flowchart TD"]
+        
+        # ノード定義を生成
+        node_definitions = []
+        node_connections = []
+        
+        def traverse(node, connections):
+            # ノード定義
+            node_label = f'{node.name}'
+            if node.value:
+                node_label += f' ({node.value})'
+                
+            # 新規: ROI情報が含まれている場合はそれも表示
+            if node.roi_percentage is not None:
+                node_label += f' [ROI:{node.roi_percentage:.1f}%]'
+                
+            node_definitions.append(f'    {node.id}["{node_label}"]')
+            
+            # エッジ（接続）を追加
+            for child in node.children:
+                connections.append(f'    {node.id} --> {child.id}')
+                traverse(child, connections)
+        
+        traverse(self, node_connections)
+        
+        # 定義とエッジを結合
+        return "\n".join(lines + node_definitions + node_connections)
     
-    Returns:
-        ROI tree with default structure
-    """
-    root = ROINode("ROI", "Business benefit")
+    # 新規: ROI関連の情報を設定する
+    def set_roi_data(self, cost: float, benefit: float, implementation_period: str = None, priority: int = None) -> None:
+        """
+        ROI関連の情報を設定する
+        
+        Args:
+            cost: コスト
+            benefit: 効果
+            implementation_period: 実装期間（オプション）
+            priority: 優先度（オプション）
+        """
+        self.cost = cost
+        self.benefit = benefit
+        
+        # ROIを計算（コストが0の場合は無限大とする）
+        if cost > 0:
+            self.roi_percentage = (benefit - cost) / cost * 100
+        else:
+            self.roi_percentage = float('inf')
+            
+        self.implementation_period = implementation_period
+        self.priority = priority
     
-    # Add default children
-    cost_reduction = root.add_child(
-        ROINode("コスト削減", "Reducing operational expenses")
-    )
-    revenue_increase = root.add_child(
-        ROINode("売上拡大", "Growing top-line revenue")
-    )
-    
-    return root
+    # 新規: ROI情報を取得する
+    def get_roi_data(self) -> Optional[ROIData]:
+        """
+        ノードのROI情報を取得する
+        
+        Returns:
+            ROI情報。ROI関連フィールドがNoneの場合はNoneを返す
+        """
+        if self.cost is None or self.benefit is None:
+            return None
+            
+        return ROIData(
+            node_id=self.id,
+            node_name=self.name,
+            cost=self.cost,
+            benefit=self.benefit,
+            roi_percentage=self.roi_percentage,
+            implementation_period=self.implementation_period,
+            priority=self.priority
+        )
 
 
 def mermaid_to_roi_tree(mermaid_text: str) -> Optional[ROINode]:
     """
-    Parse a Mermaid diagram into an ROI tree
+    Mermaid記法からROIツリーを構築する
     
     Args:
-        mermaid_text: Mermaid diagram text
+        mermaid_text: Mermaid記法の文字列
         
     Returns:
-        ROI tree root node or None if parsing fails
+        ROIツリーのルートノード、解析に失敗した場合はNone
     """
-    try:
-        lines = [line.strip() for line in mermaid_text.split('\n') if line.strip()]
-        
-        # Skip the 'graph TD' line
-        if lines[0].startswith('graph '):
-            lines = lines[1:]
-        
-        # First, identify all nodes
-        nodes = {}
-        node_pattern = r'\s*(\w+)\[\"([^\"]+)\"\]'
-        import re
-        
-        for line in lines:
-            match = re.match(node_pattern, line)
-            if match:
-                node_id = match.group(1)
-                node_label = match.group(2)
-                
-                # Extract value if present
+    # 前処理: 先頭行が 'graph TD' または 'flowchart TD' であれば削除
+    lines = mermaid_text.strip().split('\n')
+    if lines[0].startswith('graph TD') or lines[0].startswith('flowchart TD'):
+        lines = lines[1:]
+    
+    # ノード定義と接続を分離
+    node_defs = {}
+    connections = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('%'):
+            continue
+            
+        # ノード定義をパース（例: node1["テキスト"]）
+        node_match = re.match(r'(\w+)\s*\[\s*"([^"]+)"\s*\]', line)
+        if node_match:
+            node_id = node_match.group(1)
+            node_text = node_match.group(2)
+            
+            # 数値を抽出（例: テキスト (100)）
+            value_match = re.search(r'\(([^)]+)\)', node_text)
+            if value_match:
+                value = value_match.group(1)
+                name = node_text.replace(f' ({value})', '')
+            else:
                 value = None
-                value_match = re.search(r'\(([\d\.]+[億万]?円)\)', node_label)
-                if value_match:
-                    value_str = value_match.group(1)
-                    node_label = node_label.replace(f" ({value_str})", "")
-                    
-                    # Convert to numeric value
-                    if '億円' in value_str:
-                        value = float(value_str.replace('億円', '')) * 100000000
-                    elif '万円' in value_str:
-                        value = float(value_str.replace('万円', '')) * 10000
-                    else:
-                        value = float(value_str.replace('円', '').replace(',', ''))
+                name = node_text
                 
-                nodes[node_id] = ROINode(node_label, value=value)
-        
-        # Then, establish parent-child relationships
-        edge_pattern = r'\s*(\w+)\s*-->\s*(\w+)'
-        
-        for line in lines:
-            match = re.match(edge_pattern, line)
-            if match:
-                parent_id = match.group(1)
-                child_id = match.group(2)
+            # 新規: ROI情報を抽出
+            roi_match = re.search(r'\[ROI:([^%]+)%\]', node_text)
+            if roi_match:
+                roi_percentage = float(roi_match.group(1))
+                name = name.replace(f' [ROI:{roi_percentage}%]', '')
+            else:
+                roi_percentage = None
                 
-                if parent_id in nodes and child_id in nodes:
-                    nodes[parent_id].add_child(nodes[child_id])
-        
-        # Identify the root node (has no parents)
-        parents = set()
-        children = set()
-        
-        for line in lines:
-            match = re.match(edge_pattern, line)
-            if match:
-                parents.add(match.group(1))
-                children.add(match.group(2))
-        
-        root_candidates = parents - children
-        if root_candidates:
-            root_id = next(iter(root_candidates))
-            return nodes[root_id]
-        
-        # If no clear root, just return the first node
-        return next(iter(nodes.values()))
+            node = ROINode(node_id, name, value)
+            
+            # 新規: ROI情報がある場合は設定
+            if roi_percentage is not None:
+                # ROI情報のみからコストと効果を計算できないため仮のデータを設定
+                node.roi_percentage = roi_percentage
+                
+            node_defs[node_id] = node
+        else:
+            # 接続をパース（例: node1 --> node2）
+            connection_match = re.match(r'(\w+)\s*-->\s*(\w+)', line)
+            if connection_match:
+                parent_id = connection_match.group(1)
+                child_id = connection_match.group(2)
+                connections.append((parent_id, child_id))
     
-    except Exception as e:
-        print(f"Error parsing Mermaid diagram: {str(e)}")
+    # ツリーを構築
+    if not node_defs:
         return None
+        
+    # 接続に従ってノードを結合
+    for parent_id, child_id in connections:
+        if parent_id in node_defs and child_id in node_defs:
+            node_defs[parent_id].add_child(node_defs[child_id])
+    
+    # ルートノードを探す（親がないノード）
+    root_candidates = {}
+    for node_id, node in node_defs.items():
+        if node.parent is None:
+            root_candidates[node_id] = node
+    
+    # ルートノードが複数ある場合は、接続で子になっていないノードをルートとする
+    root_nodes = []
+    for parent_id, child_id in connections:
+        if parent_id in root_candidates and child_id in root_candidates:
+            del root_candidates[child_id]
+    
+    # 残ったルート候補からルートノードを選択（複数ある場合は最初のものを使用）
+    root_nodes = list(root_candidates.values())
+    if not root_nodes:
+        return None
+        
+    return root_nodes[0]
 
 
-def get_leaf_nodes(node: ROINode) -> List[ROINode]:
-    """Get all leaf nodes from the tree"""
-    if not node.children:
-        return [node]
+def get_leaf_nodes(root_node: ROINode) -> List[ROINode]:
+    """
+    ROIツリーの末端ノード（子を持たないノード）を取得する
     
-    leaves = []
-    for child in node.children:
-        leaves.extend(get_leaf_nodes(child))
+    Args:
+        root_node: ROIツリーのルートノード
+        
+    Returns:
+        末端ノードのリスト
+    """
+    leaf_nodes = []
     
-    return leaves
+    def traverse(node):
+        if not node.children:
+            leaf_nodes.append(node)
+        else:
+            for child in node.children:
+                traverse(child)
+    
+    traverse(root_node)
+    return leaf_nodes
+
+
+def create_default_roi_tree() -> ROINode:
+    """
+    デフォルトのROIツリーを作成する
+    
+    Returns:
+        デフォルトROIツリーのルートノード
+    """
+    root = ROINode("root", "ROI")
+    
+    cost_reduction = ROINode("cost", "コスト削減")
+    revenue_increase = ROINode("revenue", "売上拡大")
+    
+    root.add_child(cost_reduction)
+    root.add_child(revenue_increase)
+    
+    return root
+
+
+# 新規: ノードのコストと効果を抽出する
+def extract_cost_benefit_from_node(node_text: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    ノードテキストからコストと効果を抽出する
+    
+    Args:
+        node_text: ノードテキスト
+        
+    Returns:
+        (コスト, 効果)のタプル。抽出できない場合はNone
+    """
+    cost_pattern = r'コスト[:：]?(\d+[,.]*\d*)\s*[億万千]?円'
+    benefit_pattern = r'効果[:：]?(\d+[,.]*\d*)\s*[億万千]?円'
+    
+    # コスト抽出
+    cost_match = re.search(cost_pattern, node_text)
+    cost = None
+    if cost_match:
+        cost_str = cost_match.group(1).replace(',', '')
+        try:
+            cost = float(cost_str)
+            if '億円' in node_text:
+                cost *= 100000000
+            elif '万円' in node_text:
+                cost *= 10000
+            elif '千円' in node_text:
+                cost *= 1000
+        except ValueError:
+            pass
+    
+    # 効果抽出
+    benefit_match = re.search(benefit_pattern, node_text)
+    benefit = None
+    if benefit_match:
+        benefit_str = benefit_match.group(1).replace(',', '')
+        try:
+            benefit = float(benefit_str)
+            if '億円' in node_text:
+                benefit *= 100000000
+            elif '万円' in node_text:
+                benefit *= 10000
+            elif '千円' in node_text:
+                benefit *= 1000
+        except ValueError:
+            pass
+    
+    return cost, benefit
+
+
+# 新規: ROIツリーを計算して更新する
+def calculate_roi_for_tree(root_node: ROINode) -> None:
+    """
+    ROIツリー全体のROIを計算して更新する
+    
+    Args:
+        root_node: ROIツリーのルートノード
+    """
+    # 葉ノードから上に遡りながらROIを計算
+    def traverse(node):
+        if not node.children:
+            # 末端ノードは既に値が設定されているはず
+            return node.cost or 0, node.benefit or 0
+        else:
+            total_cost = 0
+            total_benefit = 0
+            
+            # 子ノードのコストと効果を合計
+            for child in node.children:
+                child_cost, child_benefit = traverse(child)
+                total_cost += child_cost
+                total_benefit += child_benefit
+            
+            # 非末端ノードのROIを計算
+            node.cost = total_cost
+            node.benefit = total_benefit
+            if total_cost > 0:
+                node.roi_percentage = (total_benefit - total_cost) / total_cost * 100
+            else:
+                node.roi_percentage = float('inf') if total_benefit > 0 else 0
+                
+            return total_cost, total_benefit
+    
+    traverse(root_node)
+
+
+# 新規: ROIツリーからリスク-リターン情報を生成する
+def generate_risk_return_analysis(root_node: ROINode) -> List[NodeRiskReturn]:
+    """
+    ROIツリーからノードごとのリスク-リターン分析を生成する
+    
+    Args:
+        root_node: ROIツリーのルートノード
+        
+    Returns:
+        ノードごとのリスク-リターン情報のリスト
+    """
+    result = []
+    
+    # まず末端ノードを取得
+    leaf_nodes = get_leaf_nodes(root_node)
+    
+    # 各ノードのROI値を抽出
+    roi_values = [node.roi_percentage for node in leaf_nodes if node.roi_percentage is not None]
+    
+    # ROI値の最大値と最小値を取得
+    max_roi = max(roi_values) if roi_values else 100
+    min_roi = min(roi_values) if roi_values else 0
+    
+    # 各末端ノードのリスク-リターン情報を生成
+    for node in leaf_nodes:
+        if node.roi_percentage is None:
+            continue
+            
+        # ROIからリターンレベルを計算
+        if max_roi == min_roi:
+            return_level = 50  # すべて同じROIの場合は中間値
+        else:
+            return_level = 100 * (node.roi_percentage - min_roi) / (max_roi - min_roi)
+            
+        # コストからリスクレベルを計算（コストが高いほどリスクも高い）
+        if node.cost is None:
+            risk_level = 50  # コスト不明の場合は中間値
+        else:
+            # 所有する末端ノードの中でのコスト相対値
+            max_cost = max([n.cost for n in leaf_nodes if n.cost is not None]) if any(n.cost is not None for n in leaf_nodes) else 1
+            risk_level = 100 * (node.cost / max_cost) if max_cost > 0 else 0
+        
+        # 実装難易度は優先度の逆数に比例（優先度が高いほど実装は容易）
+        implementation_difficulty = 100 - (node.priority * 20) if node.priority is not None else 50
+        
+        # 戦略的重要度はROIとリターンの積に比例
+        strategic_importance = (return_level * node.roi_percentage) / 100 if node.roi_percentage is not None else 50
+        
+        result.append(NodeRiskReturn(
+            node_id=node.id,
+            node_name=node.name,
+            risk_level=risk_level,
+            return_level=return_level,
+            implementation_difficulty=implementation_difficulty,
+            strategic_importance=strategic_importance,
+            roi_percentage=node.roi_percentage,
+            estimated_timeframe=node.implementation_period or "不明"
+        ))
+    
+    return result
