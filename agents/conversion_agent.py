@@ -42,7 +42,7 @@ class ConversionAgent:
 
 レスポンスは以下のJSON形式で返してください:
 ```json
-{
+{{
   "can_convert": true/false,
   "needs_additional_info": true/false,
   "required_info": ["必要な情報1", "必要な情報2"],
@@ -50,7 +50,7 @@ class ConversionAgent:
   "conversion_factor": 数値 または null,
   "conversion_formula": "計算式",
   "explanation": "変換の説明"
-}
+}}
 ```"""),
             ("human", """以下の数値情報を分析し、ROI計算のために金額（円）に変換するために必要な情報と変換方法を提案してください。
 
@@ -111,19 +111,19 @@ JSON形式で回答してください。
 
 レスポンスは以下のJSON形式で返してください:
 ```json
-{
+{{
   "conversion_quality": 0-100,
   "confidence": 0-100,
   "strengths": ["強み1", "強み2"],
   "weaknesses": ["弱点1", "弱点2"],
   "improvement_suggestions": ["改善案1", "改善案2"],
   "needs_reconsideration": true/false,
-  "alternative_conversion": {
+  "alternative_conversion": {{
     "factor": 数値 または null,
     "formula": "代替計算式",
     "explanation": "代替案の説明"
-  }
-}
+  }}
+}}
 ```"""),
             ("human", """以下の単位変換結果を評価してください：
 
