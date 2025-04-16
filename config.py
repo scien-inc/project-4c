@@ -23,7 +23,7 @@ def debug_api_key():
         return False
 
 # デフォルトのモデル設定
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODEL = "o3-mini"
 
 # 他の設定
 MAX_TOKENS = 4000
