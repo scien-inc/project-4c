@@ -14,10 +14,10 @@ class NLUAgent:
     """
     自然言語理解を行い、ユーザーのメッセージからノード情報と数値を抽出するエージェント
     """
-    def __init__(self, model_name="gpt-4o"):
+    def __init__(self, model_name="o3-mini"):
         self.llm = ChatOpenAI(
             model=model_name,
-            temperature=0.1,
+            #temperature=0.1,
             streaming=False  # 解析には素早いレスポンスが必要
         )
         

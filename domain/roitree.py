@@ -1,15 +1,15 @@
 """
 domain/roitree.py
-ROI Tree data structure and utilities
+Enhanced ROI Tree data structure with DX tool support and parameter tracking
 """
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Set
 import re
 
 from domain.schemas import ROIData, NodeRiskReturn
 
 
 class ROINode:
-    """ROIツリーのノードを表すクラス"""
+    """ROIツリーのノードを表すクラス（DXツール対応とパラメータ追跡機能を追加）"""
     
     def __init__(self, node_id: str, name: str, value: Optional[str] = None):
         """
@@ -26,12 +26,17 @@ class ROINode:
         self.children = []
         self.parent = None
         
-        # 新規: ROI関連フィールド
+        # ROI関連フィールド
         self.cost = None
         self.benefit = None
         self.roi_percentage = None
         self.implementation_period = None
         self.priority = None
+        
+        # DXツール関連フィールド
+        self.dx_tools = []
+        self.required_parameters = []
+        self.granularity_issue = None
     
     def add_child(self, child: 'ROINode') -> None:
         """
@@ -62,9 +67,41 @@ class ROINode:
             if node.value:
                 node_label += f' ({node.value})'
                 
-            # 新規: ROI情報が含まれている場合はそれも表示
+            # ROI情報が含まれている場合はそれも表示
+            roi_info = []
             if node.roi_percentage is not None:
-                node_label += f' [ROI:{node.roi_percentage:.1f}%]'
+                roi_info.append(f"ROI:{node.roi_percentage:.1f}%")
+            if node.cost is not None:
+                if node.cost >= 100000000:  # 1億円以上
+                    roi_info.append(f"コスト:{node.cost/100000000:.1f}億円")
+                elif node.cost >= 10000:  # 1万円以上
+                    roi_info.append(f"コスト:{node.cost/10000:.1f}万円")
+                else:
+                    roi_info.append(f"コスト:{node.cost:.0f}円")
+            if node.benefit is not None:
+                if node.benefit >= 100000000:  # 1億円以上
+                    roi_info.append(f"効果:{node.benefit/100000000:.1f}億円")
+                elif node.benefit >= 10000:  # 1万円以上
+                    roi_info.append(f"効果:{node.benefit/10000:.1f}万円")
+                else:
+                    roi_info.append(f"効果:{node.benefit:.0f}円")
+            if node.implementation_period:
+                roi_info.append(f"期間:{node.implementation_period}")
+            if node.priority:
+                roi_info.append(f"優先度:{node.priority}")
+            
+            # # DXツール情報を追加
+            # if node.dx_tools and not node.children:  # 末端ノードの場合のみ
+            #     dx_info = f"DXツール:{','.join(node.dx_tools)}"
+            #     roi_info.append(dx_info)
+            
+            # # パラメータ情報を追加
+            # if node.required_parameters and not node.children:  # 末端ノードの場合のみ
+            #     param_info = f"パラメータ:{','.join(node.required_parameters)}"
+            #     roi_info.append(param_info)
+            
+            if roi_info:
+                node_label += f" [{'/'.join(roi_info)}]"
                 
             node_definitions.append(f'    {node.id}["{node_label}"]')
             
@@ -78,7 +115,6 @@ class ROINode:
         # 定義とエッジを結合
         return "\n".join(lines + node_definitions + node_connections)
     
-    # 新規: ROI関連の情報を設定する
     def set_roi_data(self, cost: float, benefit: float, implementation_period: str = None, priority: int = None) -> None:
         """
         ROI関連の情報を設定する
@@ -101,7 +137,6 @@ class ROINode:
         self.implementation_period = implementation_period
         self.priority = priority
     
-    # 新規: ROI情報を取得する
     def get_roi_data(self) -> Optional[ROIData]:
         """
         ノードのROI情報を取得する
@@ -121,11 +156,38 @@ class ROINode:
             implementation_period=self.implementation_period,
             priority=self.priority
         )
+    
+    def set_dx_tools(self, dx_tools: List[str]) -> None:
+        """
+        このノードに適用可能なDXツールリストを設定する
+        
+        Args:
+            dx_tools: DXツールのリスト
+        """
+        self.dx_tools = dx_tools
+    
+    def set_required_parameters(self, parameters: List[str]) -> None:
+        """
+        このノードのROI計算に必要なパラメータリストを設定する
+        
+        Args:
+            parameters: パラメータのリスト
+        """
+        self.required_parameters = parameters
+    
+    def set_granularity_issue(self, issue: Dict[str, Any]) -> None:
+        """
+        このノードの粒度に関する問題を設定する
+        
+        Args:
+            issue: 粒度の問題を表す辞書
+        """
+        self.granularity_issue = issue
 
 
 def mermaid_to_roi_tree(mermaid_text: str) -> Optional[ROINode]:
     """
-    Mermaid記法からROIツリーを構築する
+    Mermaid記法からROIツリーを構築する（パラメータ情報とDXツール情報を抽出）
     
     Args:
         mermaid_text: Mermaid記法の文字列
@@ -135,7 +197,7 @@ def mermaid_to_roi_tree(mermaid_text: str) -> Optional[ROINode]:
     """
     # 前処理: 先頭行が 'graph TD' または 'flowchart TD' であれば削除
     lines = mermaid_text.strip().split('\n')
-    if lines[0].startswith('graph TD') or lines[0].startswith('flowchart TD'):
+    if lines and (lines[0].startswith('graph TD') or lines[0].startswith('flowchart TD')):
         lines = lines[1:]
     
     # ノード定義と接続を分離
@@ -162,20 +224,92 @@ def mermaid_to_roi_tree(mermaid_text: str) -> Optional[ROINode]:
                 value = None
                 name = node_text
                 
-            # 新規: ROI情報を抽出
-            roi_match = re.search(r'\[ROI:([^%]+)%\]', node_text)
+            # ROI情報を抽出
+            roi_info = {}
+            roi_match = re.search(r'\[(.*?)\]', node_text)
             if roi_match:
-                roi_percentage = float(roi_match.group(1))
-                name = name.replace(f' [ROI:{roi_percentage}%]', '')
-            else:
-                roi_percentage = None
+                roi_text = roi_match.group(1)
+                name = name.replace(f' [{roi_text}]', '')
                 
+                # ROIの各部分を抽出
+                roi_parts = roi_text.split('/')
+                for part in roi_parts:
+                    if part.startswith('ROI:'):
+                        try:
+                            roi_info['roi_percentage'] = float(part.replace('ROI:', '').replace('%', ''))
+                        except ValueError:
+                            pass
+                    elif part.startswith('コスト:'):
+                        cost_text = part.replace('コスト:', '')
+                        multiplier = 1
+                        if '億円' in cost_text:
+                            multiplier = 100000000
+                            cost_text = cost_text.replace('億円', '')
+                        elif '万円' in cost_text:
+                            multiplier = 10000
+                            cost_text = cost_text.replace('万円', '')
+                        elif '千円' in cost_text:
+                            multiplier = 1000
+                            cost_text = cost_text.replace('千円', '')
+                        else:
+                            cost_text = cost_text.replace('円', '')
+                            
+                        try:
+                            roi_info['cost'] = float(cost_text) * multiplier
+                        except ValueError:
+                            pass
+                    elif part.startswith('効果:'):
+                        benefit_text = part.replace('効果:', '')
+                        multiplier = 1
+                        if '億円' in benefit_text:
+                            multiplier = 100000000
+                            benefit_text = benefit_text.replace('億円', '')
+                        elif '万円' in benefit_text:
+                            multiplier = 10000
+                            benefit_text = benefit_text.replace('万円', '')
+                        elif '千円' in benefit_text:
+                            multiplier = 1000
+                            benefit_text = benefit_text.replace('千円', '')
+                        else:
+                            benefit_text = benefit_text.replace('円', '')
+                            
+                        try:
+                            roi_info['benefit'] = float(benefit_text) * multiplier
+                        except ValueError:
+                            pass
+                    elif part.startswith('期間:'):
+                        roi_info['implementation_period'] = part.replace('期間:', '')
+                    elif part.startswith('優先度:'):
+                        try:
+                            roi_info['priority'] = int(part.replace('優先度:', ''))
+                        except ValueError:
+                            pass
+                    # DXツール情報を抽出
+                    elif part.startswith('DXツール:'):
+                        dx_tools = part.replace('DXツール:', '').split(',')
+                        roi_info['dx_tools'] = [tool.strip() for tool in dx_tools]
+                    # パラメータ情報を抽出
+                    elif part.startswith('パラメータ:'):
+                        parameters = part.replace('パラメータ:', '').split(',')
+                        roi_info['parameters'] = [param.strip() for param in parameters]
+            
             node = ROINode(node_id, name, value)
             
-            # 新規: ROI情報がある場合は設定
-            if roi_percentage is not None:
-                # ROI情報のみからコストと効果を計算できないため仮のデータを設定
-                node.roi_percentage = roi_percentage
+            # ROI情報があれば設定
+            if 'roi_percentage' in roi_info:
+                node.roi_percentage = roi_info['roi_percentage']
+            if 'cost' in roi_info:
+                node.cost = roi_info['cost']
+            if 'benefit' in roi_info:
+                node.benefit = roi_info['benefit']
+            if 'implementation_period' in roi_info:
+                node.implementation_period = roi_info['implementation_period']
+            if 'priority' in roi_info:
+                node.priority = roi_info['priority']
+            if 'dx_tools' in roi_info:
+                node.dx_tools = roi_info['dx_tools']
+            if 'parameters' in roi_info:
+                node.required_parameters = roi_info['parameters']
                 
             node_defs[node_id] = node
         else:
@@ -202,7 +336,6 @@ def mermaid_to_roi_tree(mermaid_text: str) -> Optional[ROINode]:
             root_candidates[node_id] = node
     
     # ルートノードが複数ある場合は、接続で子になっていないノードをルートとする
-    root_nodes = []
     for parent_id, child_id in connections:
         if parent_id in root_candidates and child_id in root_candidates:
             del root_candidates[child_id]
@@ -238,9 +371,94 @@ def get_leaf_nodes(root_node: ROINode) -> List[ROINode]:
     return leaf_nodes
 
 
+def get_leaf_nodes_with_dx_tools(root_node: ROINode) -> List[ROINode]:
+    """
+    DXツール情報を持つ末端ノードを取得する
+    
+    Args:
+        root_node: ROIツリーのルートノード
+        
+    Returns:
+        DXツール情報を持つ末端ノードのリスト
+    """
+    leaf_nodes = get_leaf_nodes(root_node)
+    return [node for node in leaf_nodes if node.dx_tools]
+
+
+def get_nodes_with_parameters(root_node: ROINode) -> List[ROINode]:
+    """
+    パラメータ情報を持つノードを取得する
+    
+    Args:
+        root_node: ROIツリーのルートノード
+        
+    Returns:
+        パラメータ情報を持つノードのリスト
+    """
+    nodes_with_parameters = []
+    
+    def traverse(node):
+        if node.required_parameters:
+            nodes_with_parameters.append(node)
+        for child in node.children:
+            traverse(child)
+    
+    traverse(root_node)
+    return nodes_with_parameters
+
+
+def get_common_parameters(root_node: ROINode) -> Set[str]:
+    """
+    ROIツリー全体で共通して使用されるパラメータを取得する
+    
+    Args:
+        root_node: ROIツリーのルートノード
+        
+    Returns:
+        共通パラメータのセット
+    """
+    nodes_with_parameters = get_nodes_with_parameters(root_node)
+    
+    # 複数のノードで使用されるパラメータをカウント
+    parameter_counts = {}
+    for node in nodes_with_parameters:
+        for param in node.required_parameters:
+            if param in parameter_counts:
+                parameter_counts[param] += 1
+            else:
+                parameter_counts[param] = 1
+    
+    # 複数のノードで使用されるパラメータを共通パラメータとみなす
+    common_threshold = max(2, len(nodes_with_parameters) // 3)  # 全ノードの1/3以上で使用されるパラメータ
+    common_parameters = {param for param, count in parameter_counts.items() if count >= common_threshold}
+    
+    # 明らかに共通と思われるパラメータを追加
+    always_common = {'人件費', '時給', '工数', '工数単価', '年間稼働日数', '月間稼働時間'}
+    common_parameters.update({param for param in parameter_counts.keys() if any(common in param.lower() for common in always_common)})
+    
+    return common_parameters
+
+
+def extract_node_specific_parameters(node: ROINode, common_parameters: Set[str]) -> List[str]:
+    """
+    ノード固有のパラメータを抽出する
+    
+    Args:
+        node: 対象ノード
+        common_parameters: 共通パラメータのセット
+        
+    Returns:
+        ノード固有のパラメータリスト
+    """
+    if not node.required_parameters:
+        return []
+    
+    return [param for param in node.required_parameters if param not in common_parameters]
+
+
 def create_default_roi_tree() -> ROINode:
     """
-    デフォルトのROIツリーを作成する
+    デフォルトのROIツリーを作成する（より多くの分岐を持つ複雑な構造）
     
     Returns:
         デフォルトROIツリーのルートノード
@@ -253,10 +471,132 @@ def create_default_roi_tree() -> ROINode:
     root.add_child(cost_reduction)
     root.add_child(revenue_increase)
     
+    # コスト削減の下位カテゴリ（4つのサブカテゴリ）
+    process_automation = ROINode("process", "業務プロセス自動化")
+    resource_optimization = ROINode("resource", "リソース最適化")
+    it_infrastructure = ROINode("infra", "IT基盤最適化")
+    operational_efficiency = ROINode("ops", "運用効率化")
+    
+    cost_reduction.add_child(process_automation)
+    cost_reduction.add_child(resource_optimization)
+    cost_reduction.add_child(it_infrastructure)
+    cost_reduction.add_child(operational_efficiency)
+    
+    # 業務プロセス自動化の下位項目（3つ）
+    rpa_implementation = ROINode("rpa", "RPAによる定型業務自動化")
+    ai_document_processing = ROINode("ai_doc", "AI文書処理自動化")
+    workflow_digitization = ROINode("workflow", "ワークフローのデジタル化")
+    
+    process_automation.add_child(rpa_implementation)
+    process_automation.add_child(ai_document_processing)
+    process_automation.add_child(workflow_digitization)
+    
+    # リソース最適化の下位項目（3つ）
+    inventory_management = ROINode("inventory", "在庫管理システム最適化")
+    workforce_planning = ROINode("workforce", "人員配置最適化システム")
+    energy_optimization = ROINode("energy", "エネルギー使用効率化")
+    
+    resource_optimization.add_child(inventory_management)
+    resource_optimization.add_child(workforce_planning)
+    resource_optimization.add_child(energy_optimization)
+    
+    # IT基盤最適化の下位項目（3つ）
+    cloud_migration = ROINode("cloud", "クラウド移行によるインフラコスト削減")
+    license_optimization = ROINode("license", "ソフトウェアライセンス最適化")
+    server_consolidation = ROINode("server", "サーバー統合・仮想化")
+    
+    it_infrastructure.add_child(cloud_migration)
+    it_infrastructure.add_child(license_optimization)
+    it_infrastructure.add_child(server_consolidation)
+    
+    # 運用効率化の下位項目（3つ）
+    predictive_maintenance = ROINode("maintenance", "予知保全システム導入")
+    remote_monitoring = ROINode("monitoring", "遠隔監視システム構築")
+    facility_automation = ROINode("facility", "施設管理自動化")
+    
+    operational_efficiency.add_child(predictive_maintenance)
+    operational_efficiency.add_child(remote_monitoring)
+    operational_efficiency.add_child(facility_automation)
+    
+    # 売上拡大の下位カテゴリ（4つのサブカテゴリ）
+    customer_experience = ROINode("cx", "顧客体験向上")
+    market_expansion = ROINode("market", "市場拡大")
+    product_innovation = ROINode("product", "商品・サービス革新")
+    sales_effectiveness = ROINode("sales", "販売効率向上")
+    
+    revenue_increase.add_child(customer_experience)
+    revenue_increase.add_child(market_expansion)
+    revenue_increase.add_child(product_innovation)
+    revenue_increase.add_child(sales_effectiveness)
+    
+    # 顧客体験向上の下位項目（3つ）
+    chatbot_implementation = ROINode("chatbot", "AIチャットボット導入")
+    personalization_engine = ROINode("personalize", "パーソナライゼーションエンジン実装")
+    omnichannel_integration = ROINode("omnichannel", "オムニチャネル連携基盤構築")
+    
+    customer_experience.add_child(chatbot_implementation)
+    customer_experience.add_child(personalization_engine)
+    customer_experience.add_child(omnichannel_integration)
+    
+    # 市場拡大の下位項目（3つ）
+    digital_marketing = ROINode("digital_mkt", "デジタルマーケティング強化")
+    global_ecommerce = ROINode("ecommerce", "グローバルEコマース展開")
+    new_segment_analytics = ROINode("segment", "新規顧客セグメント分析・開拓")
+    
+    market_expansion.add_child(digital_marketing)
+    market_expansion.add_child(global_ecommerce)
+    market_expansion.add_child(new_segment_analytics)
+    
+    # 商品・サービス革新の下位項目（3つ）
+    predictive_analytics = ROINode("pred_analytics", "予測分析による製品開発")
+    digital_product_dev = ROINode("digital_prod", "デジタル製品・サービス開発")
+    ai_innovation = ROINode("ai_innov", "AI活用による商品革新")
+    
+    product_innovation.add_child(predictive_analytics)
+    product_innovation.add_child(digital_product_dev)
+    product_innovation.add_child(ai_innovation)
+    
+    # 販売効率向上の下位項目（3つ）
+    sales_automation = ROINode("sales_auto", "営業プロセス自動化")
+    customer_data_platform = ROINode("cdp", "顧客データプラットフォーム構築")
+    pricing_optimization = ROINode("pricing", "価格最適化システム")
+    
+    sales_effectiveness.add_child(sales_automation)
+    sales_effectiveness.add_child(customer_data_platform)
+    sales_effectiveness.add_child(pricing_optimization)
+    
+    # 末端ノードに必要なパラメータとDXツールを設定
+    rpa_implementation.set_required_parameters(["初期導入コスト", "月額費用", "自動化対象プロセス数", "プロセスあたり工数", "人件費単価"])
+    rpa_implementation.set_dx_tools(["UiPath", "Automation Anywhere", "Blue Prism"])
+    
+    chatbot_implementation.set_required_parameters(["初期導入コスト", "月額費用", "問い合わせ削減率", "月間問い合わせ数", "問い合わせ対応時間", "人件費単価"])
+    chatbot_implementation.set_dx_tools(["Dialogflow", "IBM Watson Assistant", "Amazon Lex"])
+    
+    cloud_migration.set_required_parameters(["現行インフラコスト", "クラウド移行コスト", "移行後月額費用", "運用工数削減量", "人件費単価"])
+    cloud_migration.set_dx_tools(["AWS", "Microsoft Azure", "Google Cloud Platform"])
+    
+    digital_marketing.set_required_parameters(["マーケティング投資額", "顧客獲得単価", "コンバージョン率向上率", "顧客生涯価値"])
+    digital_marketing.set_dx_tools(["Adobe Experience Cloud", "HubSpot", "Salesforce Marketing Cloud"])
+    
+    predictive_analytics.set_required_parameters(["分析システム導入コスト", "データサイエンティスト人件費", "製品開発期間短縮率", "新製品売上予測"])
+    predictive_analytics.set_dx_tools(["Tableau", "Power BI", "DataRobot"])
+    
+    # 他の末端ノードにもパラメータとDXツールを設定（例示的に一部のみ）
+    ai_document_processing.set_required_parameters(["OCRシステム導入コスト", "月額利用料", "書類処理数", "処理時間削減率", "人件費単価"])
+    ai_document_processing.set_dx_tools(["ABBYY FineReader", "Google Document AI", "Microsoft Azure Form Recognizer"])
+    
+    workflow_digitization.set_required_parameters(["ワークフローシステム導入コスト", "月額費用", "デジタル化対象プロセス数", "プロセス効率化率", "年間処理件数"])
+    workflow_digitization.set_dx_tools(["Pega", "ServiceNow", "Appian"])
+    
+    inventory_management.set_required_parameters(["システム導入コスト", "在庫削減率", "倉庫スペースコスト", "在庫金額", "発注業務効率化率"])
+    inventory_management.set_dx_tools(["SAP Inventory Management", "Oracle SCM", "Manhattan Associates"])
+    
+    personalization_engine.set_required_parameters(["システム導入費用", "運用コスト", "コンバージョン率向上率", "顧客単価向上率", "訪問者数"])
+    personalization_engine.set_dx_tools(["Adobe Target", "Dynamic Yield", "Optimizely"])
+    
     return root
 
 
-# 新規: ノードのコストと効果を抽出する
 def extract_cost_benefit_from_node(node_text: str) -> Tuple[Optional[float], Optional[float]]:
     """
     ノードテキストからコストと効果を抽出する
@@ -305,7 +645,6 @@ def extract_cost_benefit_from_node(node_text: str) -> Tuple[Optional[float], Opt
     return cost, benefit
 
 
-# 新規: ROIツリーを計算して更新する
 def calculate_roi_for_tree(root_node: ROINode) -> None:
     """
     ROIツリー全体のROIを計算して更新する
@@ -341,7 +680,28 @@ def calculate_roi_for_tree(root_node: ROINode) -> None:
     traverse(root_node)
 
 
-# 新規: ROIツリーからリスク-リターン情報を生成する
+def extract_required_parameters_from_node(node_text: str) -> List[str]:
+    """
+    ノードテキストから必要なパラメータを抽出する
+    
+    Args:
+        node_text: ノードテキスト
+        
+    Returns:
+        必要なパラメータのリスト
+    """
+    # パラメータパターン（例: 必要パラメータ:初期コスト,月額費用,削減工数）
+    params_pattern = r'(?:必要パラメータ|パラメータ)[:：]([^[\]]+)'
+    
+    params_match = re.search(params_pattern, node_text)
+    if params_match:
+        params_text = params_match.group(1)
+        # カンマで分割してトリム
+        return [param.strip() for param in params_text.split(',')]
+    
+    return []
+
+
 def generate_risk_return_analysis(root_node: ROINode) -> List[NodeRiskReturn]:
     """
     ROIツリーからノードごとのリスク-リターン分析を生成する
