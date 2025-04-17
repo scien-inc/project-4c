@@ -5,18 +5,19 @@ Unit conversion agent for ROI calculations with self-reflection
 from typing import Dict, List, Tuple, Optional, Any
 import json
 import re
-
+from dotenv import load_dotenv
+load_dotenv()        
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 
-from domain.schemas import NumericalValue, UnitConversion
+
 
 
 class ConversionAgent:
     """Agent for converting between different units for ROI calculation with self-reflection capabilities"""
     
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "o3-mini"):
         """
         Initialize the conversion agent
         
@@ -25,7 +26,7 @@ class ConversionAgent:
         """
         self.llm = ChatOpenAI(
             model=model_name,
-            temperature=0.1,
+            #temperature=0.1,
             streaming=False  # 高速レスポンスが必要
         )
         

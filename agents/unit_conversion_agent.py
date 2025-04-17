@@ -25,7 +25,7 @@ class UnitConversionAgent:
         """
         self.llm = ChatOpenAI(
             model=model_name,
-            temperature=0.1,
+            #temperature=0.1,
             streaming=True
         )
         

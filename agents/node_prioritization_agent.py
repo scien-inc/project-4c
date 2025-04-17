@@ -25,7 +25,7 @@ class NodePrioritizationAgent:
         """
         self.llm = ChatOpenAI(
             model=model_name,
-            temperature=0.2,
+            #temperature=0.2,
             streaming=True
         )
         
