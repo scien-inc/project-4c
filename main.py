@@ -23,6 +23,7 @@ from agents.roi_chat_agent import ROIChatAgent
 from agents.conversion_agent import ConversionAgent
 from domain.roitree import ROINode, mermaid_to_roi_tree, get_leaf_nodes
 from domain.schemas import NumericalValue
+from agents.deepdive_agent import CHALLENGE_SYSTEM_PROMPT
 
 
 # Streamlitストリーミング出力のためのハンドラー
@@ -146,7 +147,6 @@ def extract_non_leaf_nodes(mermaid_code):
     # 非末端ノードとそのラベルを返す
     result = [(node_id, node_definitions.get(node_id, "")) for node_id in non_leaf_nodes]
     return result
-
 
 def get_child_nodes(mermaid_code, parent_node_id):
     """
@@ -356,6 +356,7 @@ def extract_numerical_value(value_str):
         return number
     else:
         return number  # 単位が不明な場合はそのまま返す
+# Regeneration functions that use CHALLENGE_SYSTEM_PROMPT from deepdive_agent.py
 def regenerate_roi_tree(agent, challenge_text, current_mermaid):
     """
     現在のROIツリーを参考にして新しいROIツリーを生成する
@@ -403,25 +404,9 @@ flowchart TD
         temperature=0.2,
     )
     
-    # システムメッセージとユーザーメッセージを直接指定
-    system_message = """# ROI Tree Analysis Expert
-
-あなたはビジネス課題をROIの観点から構造化する専門エージェントです。
-ユーザーから与えられる事業・組織の課題文を解析し、ROIを「コスト削減」と「売上拡大」の2つに分岐してツリー構造を生成してください。
-
-## ROIツリー作成の条件:
-- 課題を「コスト削減」と「売上拡大」の2つの主要カテゴリに分解する
-- 各カテゴリの下に、サブカテゴリが存在すれば具体的なサブカテゴリを作成する
-- 各サブカテゴリの下にさらに具体的な項目やアプローチを特定する
-- 最終的な末端ノードは、市場に出回っているDXツールで対応できる粒度にする
-- 階層の深さはDXツールで対応できる粒度にまでにする、適切な分岐を持つツリー構造にする
-- 文章中に明示的に数値目標が記載されている場合のみ、その値をノードに含める
-- 数値目標が不明確な場合は、数値を含めずにノードを作成する
-- 必ず具体的で現実的なビジネス状況に基づいたオリジナルのノード名を作成すること
-- 下記の例はあくまで参考であり、そのまま使用しないこと"""
-    
+    # deepdive_agent.pyのCHALLENGE_SYSTEM_PROMPTを使用
     messages = [
-        {"role": "system", "content": system_message},
+        {"role": "system", "content": CHALLENGE_SYSTEM_PROMPT},
         {"role": "user", "content": custom_prompt}
     ]
     
@@ -442,6 +427,8 @@ flowchart TD
     root_node = mermaid_to_roi_tree(mermaid_diagram)
     
     return root_node, mermaid_diagram
+
+
 
 
 def regenerate_child_nodes(agent, challenge_text, mermaid_diagram, parent_node_id):
@@ -507,21 +494,9 @@ def regenerate_child_nodes(agent, challenge_text, mermaid_diagram, parent_node_i
         temperature=0.2,
     )
     
-    # システムメッセージとユーザーメッセージを直接指定
-    system_message = """# ROI Tree Analysis Expert
-
-あなたはビジネス課題をROIの観点から構造化する専門エージェントです。
-指定された親ノードに対して、適切な子ノードを生成してください。
-
-## 子ノード作成の条件:
-- 子ノードは特定のDXツールで対応可能な具体的な粒度にする
-- 文章中に明示的に数値目標が記載されている場合のみ、その値をノードに含める
-- 数値目標が不明確な場合は、数値を含めずにノードを作成する
-- 必ず具体的で現実的なビジネス状況に基づいたオリジナルのノード名を作成すること
-- 親ノードの意図を踏まえた適切な子ノードを作成すること"""
-    
+    # deepdive_agent.pyのCHALLENGE_SYSTEM_PROMPTを使用
     messages = [
-        {"role": "system", "content": system_message},
+        {"role": "system", "content": CHALLENGE_SYSTEM_PROMPT},
         {"role": "user", "content": custom_prompt}
     ]
     
@@ -566,6 +541,7 @@ def regenerate_child_nodes(agent, challenge_text, mermaid_diagram, parent_node_i
     
     return '\n'.join(final_lines)
 
+
 def determine_required_parameters(node_label, challenge_text):
     """
     ノードの内容とビジネス課題から必要なパラメータを判断する
@@ -588,17 +564,17 @@ ROI計算には通常、以下のような項目が必要です：
 
 以下のJSON形式で回答してください：
 ```json
-{
+{{
   "parameters": [
-    {
+    {{
       "name": "パラメータ名",
       "question": "このパラメータを聞くための質問文",
       "unit": "単位（円、%、人など）",
       "default": デフォルト値,
       "importance": 1-5の重要度（5が最高）
-    }
+    }}
   ]
-}
+}}
 ```"""),
         ("human", f"""以下の情報から必要なパラメータを判断してください：
 
@@ -634,7 +610,7 @@ ROI計算には通常、以下のような項目が必要です：
         
         # デフォルト値を返す
         print("JSONパターンが見つかりませんでした。デフォルト値を使用します。")
-        return {"parameters": [
+        return {{"parameters": [
             {
                 "name": "初期導入コスト",
                 "question": "このDX施策の初期導入コスト（初期投資額）はいくらくらいを想定していますか？",
@@ -663,11 +639,11 @@ ROI計算には通常、以下のような項目が必要です：
                 "default": 3,
                 "importance": 3
             }
-        ]}
+        ]}}
     except Exception as e:
         print(f"JSON解析エラー: {e}")
         # エラーが発生した場合はデフォルト値を返す
-        return {"parameters": [
+        return {{"parameters": [
             {
                 "name": "初期導入コスト",
                 "question": "このDX施策の初期導入コスト（初期投資額）はいくらくらいを想定していますか？",
@@ -696,7 +672,7 @@ ROI計算には通常、以下のような項目が必要です：
                 "default": 3,
                 "importance": 3
             }
-        ]}
+        ]}}
 
 
 # 値の抽出関数（新規追加）
@@ -712,12 +688,12 @@ def extract_value_from_message(message, parameter):
 
 以下のJSON形式で回答してください：
 ```json
-{
+{{
   "extracted": true/false,
   "value": 抽出した値（数値）,
   "unit": "抽出した単位（円、%など）",
   "confidence": 0-100の確信度
-}
+}}
 ```
 値が見つからない場合はextracted=falseとし、valueは0、unitは空文字としてください。"""),
         ("human", f"""以下のメッセージから「{parameter['name']}」の値を抽出してください：
@@ -947,7 +923,7 @@ def main():
                             current_mermaid = st.session_state.mermaid_history[-1] if st.session_state.mermaid_history else st.session_state.mermaid_diagram
                             agent = st.session_state.challenge_agent
                             
-                            # 修正した再生成関数を使用
+                            # deepdive_agent.pyのCHALLENGE_SYSTEM_PROMPTを参照する再生成関数を使用
                             new_root_node, new_mermaid_diagram = regenerate_roi_tree(
                                 agent, 
                                 st.session_state.challenge_text, 
@@ -997,7 +973,7 @@ def main():
                                 parent_node_id = selected_parent.split(":")[0].strip()
                                 agent = st.session_state.challenge_agent
                                 
-                                # 修正した子ノード再生成関数を使用
+                                # deepdive_agent.pyのCHALLENGE_SYSTEM_PROMPTを参照する子ノード再生成関数を使用
                                 updated_mermaid = regenerate_child_nodes(
                                     agent,
                                     st.session_state.challenge_text,
@@ -1029,6 +1005,7 @@ def main():
                                 st.code(traceback.format_exc())
                 else:
                     st.info("親ノード（子ノードを持つノード）が見つかりません。")
+ 
                 
                 # コードとしても表示
                 with st.expander("Mermaidコード"):
