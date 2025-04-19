@@ -966,10 +966,10 @@ def main():
                         index=0 if parent_options else None
                     )
                     
-                    if selected_parent and st.button("選択したノードの子ノードを再生成", help="選択した親ノードの子ノードを再生成します"):
+                    if st.button("選択したノードの子ノードを再生成", help="選択した親ノードの子ノードを再生成します"):
                         with st.spinner("子ノードを再生成中..."):
                             try:
-                                # 選択された親ノードIDを取得
+                                # 選択された親ノードIDを検索
                                 parent_node_id = selected_parent.split(":")[0].strip()
                                 agent = st.session_state.challenge_agent
                                 
@@ -1145,7 +1145,7 @@ def main():
             
             # パラメータ収集のためのチャットインターフェースを開始
             if selected_nodes:
-                if st.button("選択したノードのROI計算を開始", type="primary"):
+                if st.button("選択したノードについて数値情報を入力する", type="primary"):
                     # チャットモードをアクティブに設定
                     st.session_state.chat_mode = "node_preparation"
                     
@@ -1188,6 +1188,21 @@ def main():
             if st.session_state.chat_mode != "inactive":
                 st.markdown("---")
                 st.subheader(f"「{st.session_state.current_node_label}」のROI計算")
+                
+                # チャット終了ボタンを追加
+                if st.button("チャットを終了する", key="exit_chat_button"):
+                    # チャットモードをリセット
+                    st.session_state.chat_mode = "inactive"
+                    st.session_state.current_node_id = None
+                    st.session_state.current_node_label = None
+                    st.session_state.required_parameters = []
+                    st.session_state.current_parameter_index = 0
+                    st.session_state.collected_values = {}
+                    st.session_state.processing_queue = []
+                    st.session_state.chat_history = []
+                    
+                    # 再ロードして状態を更新
+                    st.rerun()
                 
                 # チャット履歴の表示
                 chat_container = st.container()
@@ -1578,8 +1593,6 @@ def main():
                 
                 for i, row in roi_df.head(3).iterrows():
                     st.markdown(f"{i+1}. **{row['ノード']}** (ROI: {row['ROI']:.1f}%)")
-    
-    # タブ2と3は前のコードとほぼ同じなので省略（必要に応じて追加）
     
     
     # タブ2: 提案生成の修正部分
